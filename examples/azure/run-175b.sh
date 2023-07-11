@@ -21,9 +21,9 @@ PP=1
 # HEADS ~= HIDDEN/128
 
 # Model: 175B
-NLAYERS=96
-HIDDEN=12288
-HEADS=96
+NLAYERS=48
+HIDDEN=6144  #12288
+HEADS=48
 SEQ=1024
 
 
@@ -107,7 +107,7 @@ ds_args=" --deepspeed-activation-checkpointing ${ds_args}"
 
 
 
-deepspeed --force_multi --num_nodes=$NODES --hostfile $HF pretrain_gpt.py \
+deepspeed --num_nodes=$NODES --hostfile $HF pretrain_gpt.py \
     --tensor-model-parallel-size $TP \
     --pipeline-model-parallel-size $PP \
     --num-layers $NLAYERS \
@@ -119,8 +119,8 @@ deepspeed --force_multi --num_nodes=$NODES --hostfile $HF pretrain_gpt.py \
     --micro-batch-size $MICRO_BATCH \
     --global-batch-size $GLOBAL_BATCH \
     --train-iters 1000 \
-    --lr 6.0e-5 \
-    --min-lr 6.0e-6 \
+    --lr 1.0e-5 \
+    --min-lr 1.0e-6 \
     --lr-decay-style cosine \
     --log-interval 1 \
     --eval-iters 40 \
