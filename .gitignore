@@ -13,8 +13,3 @@ dist/
 
 # AML workspace config file
 *config.json
-
-.coverage_*
-*~
-slurm*
-logs

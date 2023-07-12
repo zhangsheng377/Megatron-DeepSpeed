@@ -1,4 +1,17 @@
-# Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+# coding=utf-8
+# Copyright (c) 2020, NVIDIA CORPORATION.  All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 """Megatron Module"""
 
@@ -7,7 +20,7 @@ from torch.autograd import Variable
 from torch.nn.parameter import Parameter
 from deepspeed.accelerator import get_accelerator
 from megatron import get_args
-from megatron.core import mpu, tensor_parallel
+from megatron import mpu
 
 
 _FLOAT_TYPES = (torch.FloatTensor, get_accelerator().FloatTensor)
@@ -25,41 +38,43 @@ class MegatronModule(torch.nn.Module):
     """Megatron specific extensions of torch Module with support
     for pipelining."""
 
-    def __init__(self, config=None, share_embeddings_and_output_weights=True):
+    def __init__(self, share_word_embeddings=True):
         super(MegatronModule, self).__init__()
-        self.config = config
-        self.share_embeddings_and_output_weights = share_embeddings_and_output_weights
+        self.share_word_embeddings = share_word_embeddings
 
 
-    def state_dict_for_save_checkpoint(self, prefix='', keep_vars=False):
+    def state_dict_for_save_checkpoint(self, destination=None, prefix='',
+                                       keep_vars=False):
         """Use this function to override the state dict for
         saving checkpoints."""
-        return self.state_dict(prefix=prefix, keep_vars=keep_vars)
+        return self.state_dict(destination, prefix, keep_vars)
 
 
-    def shared_embedding_or_output_weight(self):
-        if self.pre_process:
+    def word_embeddings_weight(self):
+        if mpu.is_pipeline_first_stage(ignore_virtual=True):
             return self.language_model.embedding.word_embeddings.weight
-        else:
-            if not self.share_embeddings_and_output_weights:
-                raise Exception('shared_embedding_or_output_weight() called for last '
-                                'stage, but share_embeddings_and_output_weights is false')
+        if mpu.is_pipeline_last_stage(ignore_virtual=True):
+            if not self.share_word_embeddings:
+                raise Exception('word_embeddings_weight() called for last '
+                                'stage, but share_word_embeddings is false')
             return self.word_embeddings.weight
+        raise Exception('word_embeddings_weight() should be '
+                        'called for first and last stage only')
 
 
-    def initialize_word_embeddings(self):
+    def initialize_word_embeddings(self, init_method_normal):
         args = get_args()
-        if not self.share_embeddings_and_output_weights:
+        if not self.share_word_embeddings:
             raise Exception('initialize_word_embeddings() was called but '
-                            'share_embeddings_and_output_weights is false')
+                            'share_word_embeddings is false')
 
         # This function just initializes the word embeddings in the final stage
-        # when we are using pipeline parallelism. Nothing to do if we aren't
-        # using pipeline parallelism.
+        # when we are using pipeline parallelism. If we aren't using pipeline
+        # parallelism there is nothing to do.
         if args.pipeline_model_parallel_size == 1:
             return
 
-        # Parameters are shared between the word embeddings layers, and the
+        # Parameters are shared between the word embeddings layer, and the
         # heads at the end of the model. In a pipelined setup with more than
         # one stage, the initial embedding layer and the head are on different
         # workers, so we do the following:
@@ -71,49 +86,29 @@ class MegatronModule(torch.nn.Module):
         # 3. In the training loop, before an all-reduce between the grads of
         #    the two word_embeddings layers to ensure that every applied weight
         #    update is the same on both stages.
-        if mpu.is_pipeline_last_stage() and not self.pre_process:
+        if mpu.is_pipeline_last_stage():
             assert not mpu.is_pipeline_first_stage()
             self._word_embeddings_for_head_key = 'word_embeddings_for_head'
             # set word_embeddings weights to 0 here, then copy first
             # stage's weights using all_reduce below.
-            self.word_embeddings = tensor_parallel.VocabParallelEmbedding(
-                args.padded_vocab_size, self.config.hidden_size,
-                config=self.config, init_method=self.config.init_method)
+            self.word_embeddings = mpu.VocabParallelEmbedding(
+                args.padded_vocab_size, args.hidden_size,
+                init_method=init_method_normal(args.init_method_std))
             self.word_embeddings.weight.data.fill_(0)
             self.word_embeddings.weight.shared = True
 
-        # Zero out initial weights for decoder embedding.
-        # NOTE: We don't currently support T5 with the interleaved schedule.
-        if not mpu.is_pipeline_first_stage(ignore_virtual=True) and \
-                self.pre_process:
-            self.language_model.embedding.zero_parameters()
-
-        if not torch.distributed.is_initialized():
-            if not getattr(MegatronModule, "embedding_warning_printed", False):
-                print("WARNING! Distributed processes aren't initialized, so "
-                      "word embeddings in the last layer are not initialized. "
-                      "If you are just manipulating a model this is fine, but "
-                      "this needs to be handled manually. If you are training "
-                      "something is definitely wrong.")
-                MegatronModule.embedding_warning_printed = True
-            return
-
         # Ensure that first and last stages have the same initial parameter
         # values.
-        if mpu.is_rank_in_embedding_group():
-            torch.distributed.all_reduce(self.shared_embedding_or_output_weight().data,
-                                         group=mpu.get_embedding_group())
-
-        # Ensure that encoder(first stage) and decoder(split stage) position
-        # embeddings have the same initial parameter values
-        # NOTE: We don't currently support T5 with the interleaved schedule.
-        if mpu.is_rank_in_position_embedding_group() and \
-                args.pipeline_model_parallel_split_rank is not None:
-            # TODO: Support tokentype embedding.
-            self.language_model.embedding.cuda()
-            position_embeddings = self.language_model.embedding.position_embeddings
-            torch.distributed.all_reduce(position_embeddings.weight.data,
-                                         group=mpu.get_position_embedding_group())
+        if torch.distributed.is_initialized():
+            if mpu.is_pipeline_first_stage() or mpu.is_pipeline_last_stage():
+                torch.distributed.all_reduce(self.word_embeddings_weight().data,
+                                             group=mpu.get_embedding_group())
+        else:
+            print("WARNING! Distributed processes aren't initialized, so "
+                  "word embeddings in the last layer are not initialized. "
+                  "If you are just manipulating a model this is fine, but "
+                  "this needs to be handled manually. If you are training "
+                  "something is definitely wrong.")
 
 
 def conversion_helper(val, conversion):
@@ -171,10 +166,6 @@ class Float16Module(MegatronModule):
         self.float16_convertor = float16_convertor
 
 
-    def set_input_tensor(self, input_tensor):
-        return self.module.set_input_tensor(input_tensor)
-
-
     def forward(self, *inputs, **kwargs):
         if mpu.is_pipeline_first_stage():
             inputs = fp32_to_float16(inputs, self.float16_convertor)
@@ -184,13 +175,14 @@ class Float16Module(MegatronModule):
         return outputs
 
 
-    def state_dict(self, prefix='', keep_vars=False):
-        return self.module.state_dict(prefix=prefix, keep_vars=keep_vars)
+    def state_dict(self, destination=None, prefix='', keep_vars=False):
+        return self.module.state_dict(destination, prefix, keep_vars)
 
 
-    def state_dict_for_save_checkpoint(self, prefix='', keep_vars=False):
-        return self.module.state_dict_for_save_checkpoint(prefix=prefix,
-                                                          keep_vars=keep_vars)
+    def state_dict_for_save_checkpoint(self, destination=None, prefix='',
+                                       keep_vars=False):
+        return self.module.state_dict_for_save_checkpoint(destination, prefix,
+                                                          keep_vars)
 
 
     def load_state_dict(self, state_dict, strict=True):
