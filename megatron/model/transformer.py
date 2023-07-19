@@ -21,6 +21,8 @@ from megatron.model.utils import attention_mask_func, openai_gelu, erf_gelu
 import deepspeed
 from deepspeed.moe.layer import MoE
 from deepspeed.accelerator import get_accelerator
+from deepspeed.sequence.layer import DistributedAttention
+
 
 try:
     from einops import rearrange
@@ -29,8 +31,12 @@ except ImportError:
 
 try:
     from flash_attn.flash_attn_interface import flash_attn_unpadded_func
+    from flash_attn.flash_attn_triton import flash_attn_func
+    from flash_attn.flash_blocksparse_attn_interface import convert_blockmask
+
 except ImportError:
     flash_attn_unpadded_func = None
+    flash_attn_func = None
 
 
 """ We use the following notation throughout this file:
@@ -221,7 +227,12 @@ class CoreAttention(MegatronModule):
         projection_size = config.kv_channels * config.num_attention_heads
 
         # Per attention head and per partition values.
-        world_size = parallel_state.get_tensor_model_parallel_world_size()
+        seq_parallel_world_size = parallel_state.get_sequence_parallel_world_size() \
+                if parallel_state.sequence_parallel_is_initialized() else 1
+        world_size = seq_parallel_world_size if seq_parallel_world_size > 1 else parallel_state.get_tensor_model_parallel_world_size()
+
+        print(f"CoreAttention world_size={world_size}")
+
         self.hidden_size_per_partition = core.utils.divide(projection_size,
                                                            world_size)
         self.hidden_size_per_attention_head = core.utils.divide(
@@ -397,6 +408,40 @@ class FlashSelfAttention(torch.nn.Module):
         output = rearrange(output, '(b s) ... -> b s ...', b=batch_size)
         return output
 
+class FlashSelfAttentionTriton(torch.nn.Module):
+    """Implement the scaled dot product attention with softmax.
+    Arguments
+    ---------
+        softmax_scale: The temperature to use for the softmax attention.
+                      (default: 1/sqrt(d_keys) where d_keys is computed at
+                      runtime)
+        attention_dropout: The dropout rate to apply to the attention
+                           (default: 0.0)
+    """
+    def __init__(self, causal=False, softmax_scale=None, attention_dropout=0.0,
+                 device=None, dtype=None):
+        super().__init__()
+        assert flash_attn_func is not None, ('Triton version of FlashAttention is not installed.')
+        assert rearrange is not None, 'Please install einops first, e.g., with pip install einops'
+        self.causal = causal
+        self.softmax_scale = softmax_scale
+        self.dropout_p = attention_dropout
+
+    def forward(self, q, k, v):
+        """Implements the multihead softmax attention.
+        Arguments
+        ---------
+            q, k, v: The tensor containing the query, key, and value. (B, S, H, D)
+        """
+
+        assert q.dtype in [torch.float16, torch.bfloat16]
+        assert q.is_cuda
+        q, k, v = [rearrange(x, 's b ... -> b s ...').contiguous()
+                       for x in (q, k, v)]
+        
+        output = flash_attn_func(q, k, v, None, self.causal)
+        output = rearrange(output, 'b s h d -> s b (h d)').contiguous()
+        return output
 
 class ParallelAttention(MegatronModule):
     """Parallel self-attention layer abstract class.
@@ -467,14 +512,25 @@ class ParallelAttention(MegatronModule):
                 bias=config.add_bias_linear,
                 gather_output=False)
 
-        self.core_attention = CoreAttention(self.layer_number, config,
-                                            self.attn_mask_type)
-        self.checkpoint_core_attention = config.recompute_granularity == 'selective'
+        self.enable_ds_sequence_parallel = parallel_state.get_sequence_parallel_world_size() > 1
+        if self.enable_ds_sequence_parallel:
+            assert args.num_attention_heads % parallel_state.get_sequence_parallel_world_size() == 0
+            if self.use_flash_attn:
+                self.local_attn = FlashSelfAttentionTriton(
+                    causal=True, attention_dropout=args.attention_dropout)
+            else:
+                self.local_attn = CoreAttention(self.layer_number, config, self.attn_mask_type)
 
-        if self.use_flash_attn:
-            self.core_attention_flash = FlashSelfAttention(
-                causal=True, attention_dropout=config.attention_dropout
-            )
+            self.dist_attn = DistributedAttention(self.local_attn,
+                                                  parallel_state.get_sequence_parallel_group())
+        else:
+            if self.use_flash_attn:
+                self.core_attention_flash = FlashSelfAttention(
+                    causal=True, attention_dropout=config.attention_dropout
+                )
+            else:
+                self.core_attention = CoreAttention(self.layer_number, config, self.attn_mask_type)
+                self.checkpoint_core_attention = config.recompute_granularity == 'selective'
 
         # Output.
         self.dense = tensor_parallel.RowParallelLinear(
@@ -651,22 +707,32 @@ class ParallelAttention(MegatronModule):
             # otherwise, only relative positional embedding takes effect
             # value_layer = apply_rotary_pos_emb(value_layer, k_pos_emb)
 
-        if not self.use_flash_attn:
-            if self.checkpoint_core_attention:
-                context_layer = self._checkpointed_attention_forward(
-                    query_layer, key_layer, value_layer, attention_mask)
+        if  self.enable_ds_sequence_parallel:
+            if not self.use_flash_attn:
+                # q, k, v = [rearrange(x, 's b ... -> b s ...').contiguous()
+                #         for x in (query_layer, key_layer, value_layer)]
+                # context_layer = self.dist_attn(q, k, v, attention_mask)
+                # context_layer = rearrange(context_layer, 'b s h d -> s b (h d)').contiguous()
+                context_layer = self.dist_attn(query_layer, key_layer, value_layer, attention_mask)
             else:
-                context_layer = self.core_attention(
-                    query_layer, key_layer, value_layer, attention_mask)
+                context_layer = self.dist_attn(query_layer, key_layer, value_layer)
         else:
-            q, k, v = [rearrange(x, 's b ... -> b s ...').contiguous()
-                       for x in (query_layer, key_layer, value_layer)]
-            if not self.sequence_parallel:
-                with tensor_parallel.get_cuda_rng_tracker().fork():
-                    context_layer = self.core_attention_flash(q, k, v)
+            if not self.use_flash_attn:
+                if self.checkpoint_core_attention:
+                    context_layer = self._checkpointed_attention_forward(
+                        query_layer, key_layer, value_layer, attention_mask)
+                else:
+                    context_layer = self.core_attention(
+                        query_layer, key_layer, value_layer, attention_mask)
             else:
-                context_layer = self.core_attention_flash(q, k, v)
-            context_layer = rearrange(context_layer, 'b s h d -> s b (h d)').contiguous()
+                q, k, v = [rearrange(x, 's b ... -> b s ...').contiguous()
+                        for x in (query_layer, key_layer, value_layer)]
+                if not self.sequence_parallel:
+                    with tensor_parallel.get_cuda_rng_tracker().fork():
+                        context_layer = self.core_attention_flash(q, k, v)
+                else:
+                    context_layer = self.core_attention_flash(q, k, v)
+                context_layer = rearrange(context_layer, 'b s h d -> s b (h d)').contiguous()
 
         # =================
         # Output. [sq, b, h]

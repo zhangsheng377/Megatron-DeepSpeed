@@ -86,7 +86,8 @@ def validate_args(args, defaults={}):
         assert args.pipeline_model_parallel_size == 1, \
             "pipeline_model_parallel_size must be 1 if pipeline parallel is disabled"
     model_parallel_size = args.pipeline_model_parallel_size * \
-                          args.tensor_model_parallel_size
+                          args.tensor_model_parallel_size * \
+                          args.sequence_parallel_size
     assert args.world_size % model_parallel_size == 0, 'world size is not'\
         ' divisible by tensor parallel size ({}) times pipeline parallel ' \
         'size ({})'.format(args.world_size, args.tensor_model_parallel_size,
@@ -856,6 +857,8 @@ def _add_training_args(parser):
     group.add_argument('--use-flash-attn', action='store_true',
                        help='use FlashAttention implementation of attention. '
                        'https://arxiv.org/abs/2205.14135')
+    group.add_argument('--use-block-sparse-attn', action='store_true',
+                       help='use block sparse attention.')
     group.add_argument('--disable-bias-linear', action='store_false',
                        help='Disable bias in the linear layers',
                        dest='add_bias_linear')
@@ -890,7 +893,9 @@ def _add_training_args(parser):
                        'check persist_ln_hidden_sizes if your hidden '
                        'size is supported.')
     group.add_argument('--sequence-parallel', action='store_true',
-                       help='Enable sequence parallel optimization.')
+                       help='Enable Megatron-LM\'s sequence parallel optimization.')
+    group.add_argument('--sequence-parallel-size', type=int, default=1,
+                       help='Enable DeepSpeed\'s sequence parallel. Cannot be combined with "--sequence-parallel", which enables Megatron-LM\'s sequence parallel.')
     group.add_argument('--no-gradient-accumulation-fusion',
                        action='store_false',
                        help='Disable fusing gradient accumulation to weight '
