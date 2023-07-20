@@ -110,7 +110,7 @@ def get_batch(data_iterator):
 
     # For DS's sequence parallel
     seq_parallel_world_size = mpu.get_sequence_parallel_world_size() if mpu.sequence_parallel_is_initialized() else 1
-    seq_parallel_world_rank = mpu.get_sequence_parallel_rank() if not mpu.sequence_parallel_is_initialized() else 0
+    seq_parallel_world_rank = mpu.get_sequence_parallel_rank() if mpu.sequence_parallel_is_initialized() else 0
     seq_length = tokens.size(1)
 
     assert seq_length % seq_parallel_world_size == 0
