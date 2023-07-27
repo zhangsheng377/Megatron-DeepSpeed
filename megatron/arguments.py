@@ -292,6 +292,10 @@ def validate_args(args, defaults={}):
         assert args.max_position_embeddings >= args.seq_length
     if args.decoder_seq_length is not None:
         assert args.max_position_embeddings >= args.decoder_seq_length
+    # When rotary position embeddings is used, set add_position_embedding
+    # to false to turn off absolute position embedding.
+    if args.use_rotary_position_embeddings:
+        args.add_position_embedding = False
     if args.lr is not None:
         assert args.min_lr <= args.lr
     if args.save is not None:
@@ -409,6 +413,17 @@ def validate_args(args, defaults={}):
         for path in args.data_path:
             data_paths.append(f"{args.aml_data_download_path}/{path}")
         args.data_path = data_paths
+
+    # GQA
+    if args.num_key_value_heads is None:
+        args.num_key_value_heads = args.num_attention_heads
+    assert args.num_attention_heads % args.num_key_value_heads == 0, \
+        f"num_attention_heads must be divisible by num_key_value_heads (got `num_attention_heads`: {args.num_attention_heads} " \
+        f"and `num_key_value_heads`: {args.num_key_value_heads})."
+    if args.num_key_value_heads != args.num_attention_heads:
+        # if GQA
+        assert not args.mos, 'GQA currently does not support args.mos'
+        assert not args.kd, 'GQA currently does not support args.kd'
 
     # Print arguments.
     _print_args("arguments", args)
@@ -579,6 +594,8 @@ def _add_network_size_args(parser):
                        'This is set to 4*hidden-size if not provided')
     group.add_argument('--num-attention-heads', type=int, default=None,
                        help='Number of transformer attention heads.')
+    group.add_argument('--num-key-value-heads', type=int, default=None,
+                       help='Number of key_value heads that should be used to implement Grouped Query Attention.')
     group.add_argument('--kv-channels', type=int, default=None,
                        help='Projection weights dimension in multi-head '
                        'attention. This is set to '
@@ -598,6 +615,11 @@ def _add_network_size_args(parser):
     group.add_argument('--make-vocab-size-divisible-by', type=int, default=128,
                        help='Pad the vocab size to be divisible by this value.'
                        'This is added for computational efficieny reasons.')
+    group.add_argument('--normalization', type=str, default='layernorm',
+                       choices=['layernorm', 'rmsnorm'],
+                       help='Options for layer normalization type:'
+                            '  layernorm'
+                            '  rmsnorm')
     group.add_argument('--layernorm-epsilon', type=float, default=1e-5,
                        help='Layer norm epsilon.')
     group.add_argument('--apply-layernorm-1p', action='store_true',
@@ -1095,7 +1117,7 @@ def _add_distributed_args(parser):
                        default=False, help='If set, use custom-built ring exchange '
                        'for p2p communications. Note that this option will require '
                        'a custom built image that support ring-exchange p2p.')
-    group.add_argument('--local_rank', type=int, default=None,
+    group.add_argument('--local-rank', type=int, default=None,
                        help='local rank passed from distributed launcher.')
     group.add_argument('--lazy-mpu-init', type=bool, required=False,
                        help='If set to True, initialize_megatron() '
