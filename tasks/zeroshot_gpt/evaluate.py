@@ -43,7 +43,7 @@ def get_model_provider(eval_metric):
                                       'is not supported.'.format(eval_metric))
 
         print_rank_0('building GPT model ...')
-        model = GPTModel(config, num_tokentypes=0, parallel_output=parallel_output,
+        model = GPTModel(config=config, num_tokentypes=0, parallel_output=parallel_output,
                          pre_process=pre_process, post_process=post_process)
 
         return model

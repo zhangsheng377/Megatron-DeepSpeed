@@ -16,7 +16,7 @@ def model_provider(pre_process=True, post_process=True):
     config = core_transformer_config_from_args(get_args())
 
     model = GPTModel(
-        config,
+        config=config,
         num_tokentypes=0,
         parallel_output=False,
         pre_process=pre_process,

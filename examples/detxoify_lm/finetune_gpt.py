@@ -31,7 +31,7 @@ def model_provider(pre_process=True, post_process=True):
 
     print_rank_0('building GPT model ...')
     model = GPTModel(
-        config,
+        config=config,
         num_tokentypes=0,
         parallel_output=True,
         pre_process=pre_process,
