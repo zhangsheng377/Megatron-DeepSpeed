@@ -2,7 +2,7 @@ import torch
 import deepspeed
 import megatron
 from megatron import get_args
-from megatron import mpu
+from megatron.core import mpu
 from megatron.checkpointing import load_checkpoint
 from megatron.initialize import initialize_megatron
 from megatron.model import GPTModel
