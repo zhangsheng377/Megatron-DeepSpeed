@@ -1,6 +1,9 @@
 # Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
 
 """Sample Generate GPT"""
+
+import deepspeed
+
 import os
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__),
@@ -42,6 +45,18 @@ def add_text_generate_args(parser):
                        help='Size of the output generated text.')
     return parser
 
+def ds_inference(model, args):
+    import megatron.model as mm
+    engine = deepspeed.init_inference(model=model,
+                                      mp_size=args.tensor_model_parallel_size,
+                                      tensor_parallel={"mpu": mpu},
+                                      dtype=torch.half,
+                                      replace_with_kernel_inject=True,
+                                      moe_experts=args.num_experts,
+                                      moe_type=args.mlp_type)
+
+    return engine.module
+
 
 if __name__ == "__main__":
     initialize_megatron(extra_args_provider=add_text_generate_args,
@@ -61,6 +76,15 @@ if __name__ == "__main__":
 
     assert len(model) == 1, "Above condition should have caught this"
     model = model[0]
+
+    import pdb; pdb.set_trace()
+
+    if args.ds_inference:
+        model = ds_inference(model, args)
+        print('> DeepSpeed Inference engine initialized')
+
+    import pdb; pdb.set_trace()
+
     if mpu.is_pipeline_first_stage() and mpu.get_tensor_model_parallel_rank() == 0:
         server = MegatronServer(model)
         server.run("0.0.0.0")
@@ -78,3 +102,4 @@ if __name__ == "__main__":
                 beam_search_and_post_process(model)
             except ValueError as ve:
                 pass
+

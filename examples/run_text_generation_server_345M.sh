@@ -6,9 +6,13 @@ DISTRIBUTED_ARGS="--nproc_per_node 1 \
                   --master_addr localhost \
                   --master_port 6000"
 
-CHECKPOINT=<Path to checkpoint (e.g /345m)>
-VOCAB_FILE=<Path to vocab.json (e.g. /gpt2-vocab.json)>
-MERGE_FILE=<Path to merges.txt (e.g. /gpt2-merges.txt)>
+#CHECKPOINT=<Path to checkpoint (e.g /345m)>
+#VOCAB_FILE=<Path to vocab.json (e.g. /gpt2-vocab.json)>
+#MERGE_FILE=<Path to merges.txt (e.g. /gpt2-merges.txt)>
+
+CHECKPOINT=dataset/checkpoints/gpt2_345m
+VOCAB_FILE=dataset/gpt2-vocab.json
+MERGE_FILE=dataset/gpt2-merges.txt
 
 export CUDA_DEVICE_MAX_CONNECTIONS=1
 
@@ -31,4 +35,5 @@ torchrun $DISTRIBUTED_ARGS tools/run_text_generation_server.py   \
        --vocab-file $VOCAB_FILE  \
        --merge-file $MERGE_FILE  \
        --top_p 0.9  \
-       --seed 42
+       --seed 42 \
+       --ds-inference
