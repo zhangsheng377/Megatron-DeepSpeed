@@ -251,8 +251,6 @@ class CoreAttention(MegatronModule):
                 if parallel_state.sequence_parallel_is_initialized() else 1
         world_size = seq_parallel_world_size if seq_parallel_world_size > 1 else parallel_state.get_tensor_model_parallel_world_size()
 
-        print(f"CoreAttention world_size={world_size}")
-
         self.hidden_size_per_partition = core.utils.divide(projection_size,
                                                            world_size)
         self.hidden_size_per_attention_head = core.utils.divide(
