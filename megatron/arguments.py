@@ -87,7 +87,7 @@ def validate_args(args, defaults={}):
             "pipeline_model_parallel_size must be 1 if pipeline parallel is disabled"
     model_parallel_size = args.pipeline_model_parallel_size * \
                           args.tensor_model_parallel_size * \
-                          args.sequence_parallel_size
+                          args.ds_sequence_parallel_size
     assert args.world_size % model_parallel_size == 0, 'world size is not'\
         ' divisible by tensor parallel size ({}) times pipeline parallel ' \
         'size ({})'.format(args.world_size, args.tensor_model_parallel_size,
@@ -916,7 +916,7 @@ def _add_training_args(parser):
                        'size is supported.')
     group.add_argument('--sequence-parallel', action='store_true',
                        help='Enable Megatron-LM\'s sequence parallel optimization.')
-    group.add_argument('--sequence-parallel-size', type=int, default=1,
+    group.add_argument('--ds-sequence-parallel-size', type=int, default=1,
                        help='Enable DeepSpeed\'s sequence parallel. Cannot be combined with "--sequence-parallel", which enables Megatron-LM\'s sequence parallel.')
     group.add_argument('--no-gradient-accumulation-fusion',
                        action='store_false',
@@ -1117,7 +1117,7 @@ def _add_distributed_args(parser):
                        default=False, help='If set, use custom-built ring exchange '
                        'for p2p communications. Note that this option will require '
                        'a custom built image that support ring-exchange p2p.')
-    group.add_argument('--local-rank', type=int, default=None,
+    group.add_argument('--local_rank', type=int, default=None,
                        help='local rank passed from distributed launcher.')
     group.add_argument('--lazy-mpu-init', type=bool, required=False,
                        help='If set to True, initialize_megatron() '
