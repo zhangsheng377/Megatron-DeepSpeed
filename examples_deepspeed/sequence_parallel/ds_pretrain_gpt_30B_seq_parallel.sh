@@ -252,7 +252,7 @@ megatron_options=" \
     --adam-beta1 0.9 \
     --adam-beta2 0.95 \
     --tensor-model-parallel-size 1 \
-    --sequence-parallel-size ${sp_size} \
+    --ds-sequence-parallel-size ${sp_size} \
     --init-method-std ${init_std} \
     --lr-decay-tokens ${lr_decay_tokens} \
     --lr-warmup-tokens ${lr_warmup_tokens} \

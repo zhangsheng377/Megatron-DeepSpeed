@@ -3,7 +3,7 @@ dir=`pwd`
 ###############################################################################
 ### Main configs
 ## GPT-3 models use 2K sequence length/context window
-seq_len=8192
+seq_len=2048
 
 ## The "GPT-3 XXX" below are configs from GPT-3 paper
 ## https://arxiv.org/abs/2005.14165, choose based on
@@ -131,6 +131,7 @@ lr_decay_style="cosine"
 ###############################################################################
 ### Parallelism configs
 ## Model parallelism, 1 is no MP
+## Currently we only support MP=1 with SP>1
 mp_size=1
 
 ## Sequence parallelism, 1 is no SP
@@ -212,7 +213,10 @@ if [[ $zero_stage -gt 0 ]]; then
     prescale_grad="false"
 fi
 if [[ $sp_size -gt 1 ]]; then
-    jobname="${jobname}_mp${sp_size}"
+    jobname="${jobname}_sp${sp_size}"
+fi
+if [[ $mp_size -gt 1 ]]; then
+    jobname="${jobname}_mp${mp_size}"
 fi
 if [ "${no_pp}" = "false" ]; then
     jobname="${jobname}_pp${pp_size}"
@@ -242,7 +246,7 @@ megatron_options=" \
     --adam-beta1 0.9 \
     --adam-beta2 0.95 \
     --tensor-model-parallel-size 1 \
-    --sequence-parallel-size ${sp_size} \
+    --ds-sequence-parallel-size ${sp_size} \
     --init-method-std ${init_std} \
     --lr-decay-tokens ${lr_decay_tokens} \
     --lr-warmup-tokens ${lr_warmup_tokens} \
@@ -277,7 +281,6 @@ megatron_options=" \
     --log-timers-to-tensorboard \
     --log-batch-size-to-tensorboard \
     --log-validation-ppl-to-tensorboard \
-    --use-flash-attn \
     --tensorboard-dir ${tensorboard_path}"
 
 if [ "${activation_checkpoint}" = "true" ]; then

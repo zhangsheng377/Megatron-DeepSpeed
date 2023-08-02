@@ -30,7 +30,7 @@ python setup.py install
 
 ## How to enable Sequence Parallelism
 
-You can enable our sequence parallelim by setting the degree of parallelism to `--sequence-parallel-size`.
+You can enable our sequence parallelim by setting the degree of parallelism to `--ds-sequence-parallel-size`.
 Note that tensor parallelism cannot be combined with this sequence parallelism.
 The number of attention heads must also be divisible this number.
 
