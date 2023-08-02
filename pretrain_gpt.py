@@ -36,7 +36,7 @@ def model_provider(pre_process=True, post_process=True):
 
     args = get_args()
     config = core_transformer_config_from_args(args)
-    with deepspeed.zero.Init(data_parallel_group=mpu.get_data_parallel_group(),
+    with deepspeed.zero.Init(sequence_data_parallel_group=mpu.get_sequence_data_parallel_group(),
                              remote_device=None if args.remote_device == 'none' else args.remote_device,
                              config_dict_or_path=args.deepspeed_config,
                              enabled=args.zero_stage == 3,
@@ -140,7 +140,6 @@ def get_batch(data_iterator):
 
     tokens = tokens[:, sub_seq_start:sub_seq_end]
     labels = labels[:, sub_seq_start:sub_seq_end]
-    loss_mask = loss_mask[:, sub_seq_start:sub_seq_end].float().contiguous()
     position_ids = position_ids[:, sub_seq_start:sub_seq_end]
 
     return tokens, labels, loss_mask, attention_mask, position_ids
