@@ -49,6 +49,8 @@ from deepspeed.compression.compress import init_compression, redundancy_clean
 from deepspeed.runtime.data_pipeline.data_routing.helper import convert_to_random_ltd
 from megatron.model.transformer import ParallelTransformerLayer
 
+from deepspeed import comm as dist
+
 def print_datetime(string):
     """Note that this call will sync across all ranks."""
     torch.distributed.barrier()
@@ -944,10 +946,10 @@ def training_log(loss_dict, total_loss_dict, learning_rate, iteration,
             if args.zero_stage > 0:
                 # ZeRO partiions optimizer states
                 opt_stats = get_accelerator().FloatTensor(opt_stats)
-                torch.distributed.all_reduce(opt_stats, group=mpu.get_data_parallel_group())
+                torch.distributed.all_reduce(opt_stats, group=mpu.get_sequence_data_parallel_group())
                 opt_stats_2 = get_accelerator().FloatTensor(opt_stats_2)
                 torch.distributed.all_reduce(opt_stats_2, op=torch.distributed.ReduceOp.MAX,
-                    group=mpu.get_data_parallel_group())
+                    group=mpu.get_sequence_data_parallel_group())
 
             if args.tensor_model_parallel_size > 1:
                 opt_stats = get_accelerator().FloatTensor(opt_stats)
