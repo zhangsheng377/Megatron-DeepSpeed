@@ -9,6 +9,7 @@ import os
 import torch
 import deepspeed
 import types
+from packaging import version
 
 import torch.nn.functional as F
 from megatron.global_vars import set_retro_args, get_retro_args
@@ -85,6 +86,10 @@ def validate_args(args, defaults={}):
     if args.no_pipeline_parallel:
         assert args.pipeline_model_parallel_size == 1, \
             "pipeline_model_parallel_size must be 1 if pipeline parallel is disabled"
+        
+    if args.ds_sequence_parallel_size > 1:
+        assert version.parse(deepspeed.__version__) >= version.parse("0.10.1"), "sequence parallelism requires DeepSpeed version 0.10.1+"
+
     model_parallel_size = args.pipeline_model_parallel_size * \
                           args.tensor_model_parallel_size * \
                           args.ds_sequence_parallel_size
