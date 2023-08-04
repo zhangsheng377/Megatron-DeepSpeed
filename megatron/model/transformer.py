@@ -497,7 +497,7 @@ class ParallelAttention(MegatronModule):
         self.num_key_value_heads = config.num_key_value_heads
         self.use_gqa = (self.num_attention_heads != self.num_key_value_heads)
 
-        self.use_flash_attn = args.use_flash_attn \
+        self.use_flash_attn = (args.use_flash_attn or args.use_flash_attn_triton) \
             and attention_type == AttnType.self_attn \
             and self.attn_mask_type == AttnMaskType.causal
         if self.use_flash_attn:
@@ -573,24 +573,23 @@ class ParallelAttention(MegatronModule):
                 bias=config.add_bias_linear,
                 gather_output=False)
 
+        # Currently FlashAttention only works with causal mask
+        if args.use_flash_attn_triton:
+            local_attn = FlashSelfAttentionTriton(causal=True, attention_dropout=args.attention_dropout)
+        elif self.use_flash_attn:
+            local_attn = FlashSelfAttention(causal=True, attention_dropout=config.attention_dropout)
+        else:
+            local_attn = CoreAttention(self.layer_number, config, self.attn_mask_type)
+
         self.enable_ds_sequence_parallel = parallel_state.get_sequence_parallel_world_size() > 1
         if self.enable_ds_sequence_parallel:
             assert args.num_attention_heads % parallel_state.get_sequence_parallel_world_size() == 0
-            if self.use_flash_attn:
-                self.local_attn = FlashSelfAttentionTriton(
-                    causal=True, attention_dropout=args.attention_dropout)
-            else:
-                self.local_attn = CoreAttention(self.layer_number, config, self.attn_mask_type)
-
-            self.dist_attn = DistributedAttention(self.local_attn,
-                                                  parallel_state.get_sequence_parallel_group())
+            self.dist_attn = DistributedAttention(local_attn, parallel_state.get_sequence_parallel_group())
         else:
             if self.use_flash_attn:
-                self.core_attention_flash = FlashSelfAttention(
-                    causal=True, attention_dropout=config.attention_dropout
-                )
+                self.core_attention_flash = local_attn
             else:
-                self.core_attention = CoreAttention(self.layer_number, config, self.attn_mask_type)
+                self.core_attention = local_attn
                 self.checkpoint_core_attention = config.recompute_granularity == 'selective'
 
         # Output.
