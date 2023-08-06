@@ -500,6 +500,7 @@ class ParallelAttention(MegatronModule):
         self.use_flash_attn = (args.use_flash_attn or args.use_flash_attn_triton) \
             and attention_type == AttnType.self_attn \
             and self.attn_mask_type == AttnMaskType.causal
+        self.use_flash_attn_triton = args.use_flash_attn_triton
         if self.use_flash_attn:
             if flash_attn_unpadded_func is None and flash_attn_varlen_func is None and flash_attn_builder is None:
                 raise ImportError('FlashAttention is not installed, please install with '
@@ -574,7 +575,7 @@ class ParallelAttention(MegatronModule):
                 gather_output=False)
 
         # Currently FlashAttention only works with causal mask
-        if args.use_flash_attn_triton:
+        if self.use_flash_attn_triton:
             local_attn = FlashSelfAttentionTriton(causal=True, attention_dropout=args.attention_dropout)
         elif self.use_flash_attn:
             local_attn = FlashSelfAttention(causal=True, attention_dropout=config.attention_dropout)
@@ -804,32 +805,39 @@ class ParallelAttention(MegatronModule):
             # otherwise, only relative positional embedding takes effect
             # value_layer = apply_rotary_pos_emb(value_layer, k_pos_emb)
 
-        if  self.enable_ds_sequence_parallel:
-            if not self.use_flash_attn:
-                # q, k, v = [rearrange(x, 's b ... -> b s ...').contiguous()
-                #         for x in (query_layer, key_layer, value_layer)]
-                # context_layer = self.dist_attn(q, k, v, attention_mask)
-                # context_layer = rearrange(context_layer, 'b s h d -> s b (h d)').contiguous()
-                context_layer = self.dist_attn(query_layer, key_layer, value_layer, attention_mask)
-            else:
+        if self.enable_ds_sequence_parallel:
+            if self.use_flash_attn:
+                if not self.use_flash_attn_triton:
+                    query_layer, key_layer, value_layer = [rearrange(x, 's b ... -> b s ...').contiguous()
+                            for x in (query_layer, key_layer, value_layer)]
+
                 context_layer = self.dist_attn(query_layer, key_layer, value_layer)
+
+                if not self.use_flash_attn_triton:
+                    context_layer = rearrange(context_layer, 'b s h d -> s b (h d)').contiguous()
+            else:
+                context_layer = self.dist_attn(query_layer, key_layer, value_layer, attention_mask)
         else:
-            if not self.use_flash_attn:
+            if self.use_flash_attn:
+                if not self.use_flash_attn_triton:
+                    query_layer, key_layer, value_layer = [rearrange(x, 's b ... -> b s ...').contiguous()
+                            for x in (query_layer, key_layer, value_layer)]
+
+                if self.sequence_parallel:
+                    context_layer = self.core_attention_flash(query_layer, key_layer, value_layer)
+                else:
+                    with tensor_parallel.get_cuda_rng_tracker().fork():
+                        context_layer = self.core_attention_flash(query_layer, key_layer, value_layer)
+
+                if not self.use_flash_attn_triton:
+                    context_layer = rearrange(context_layer, 'b s h d -> s b (h d)').contiguous()
+            else:
                 if self.checkpoint_core_attention:
                     context_layer = self._checkpointed_attention_forward(
                         query_layer, key_layer, value_layer, attention_mask)
                 else:
                     context_layer = self.core_attention(
                         query_layer, key_layer, value_layer, attention_mask)
-            else:
-                q, k, v = [rearrange(x, 's b ... -> b s ...').contiguous()
-                        for x in (query_layer, key_layer, value_layer)]
-                if not self.sequence_parallel:
-                    with tensor_parallel.get_cuda_rng_tracker().fork():
-                        context_layer = self.core_attention_flash(q, k, v)
-                else:
-                    context_layer = self.core_attention_flash(q, k, v)
-                context_layer = rearrange(context_layer, 'b s h d -> s b (h d)').contiguous()
 
         # =================
         # Output. [sq, b, h]
