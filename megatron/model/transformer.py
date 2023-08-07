@@ -582,7 +582,8 @@ class ParallelAttention(MegatronModule):
         else:
             local_attn = CoreAttention(self.layer_number, config, self.attn_mask_type)
 
-        self.enable_ds_sequence_parallel = parallel_state.get_sequence_parallel_world_size() > 1
+        self.enable_ds_sequence_parallel = parallel_state.get_sequence_parallel_world_size() > 1 \
+                                           or args.force_ds_sequence_parallel
         if self.enable_ds_sequence_parallel:
             assert args.num_attention_heads % parallel_state.get_sequence_parallel_world_size() == 0
             self.dist_attn = DistributedAttention(local_attn, parallel_state.get_sequence_parallel_group())

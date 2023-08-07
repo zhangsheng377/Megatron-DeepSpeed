@@ -100,9 +100,11 @@ def validate_args(args, defaults={}):
     args.data_parallel_size = args.world_size // model_parallel_size
     if args.rank == 0:
         print('using world size: {}, data-parallel-size: {}, '
+              'sequence-parallel size: {}, '
               'tensor-model-parallel size: {}, '
               'pipeline-model-parallel size: {} '.format(
                   args.world_size, args.data_parallel_size,
+                  args.ds_sequence_parallel_size,
                   args.tensor_model_parallel_size,
                   args.pipeline_model_parallel_size), flush=True)
     if args.pipeline_model_parallel_size > 1:
@@ -925,6 +927,8 @@ def _add_training_args(parser):
                        help='Enable Megatron-LM\'s sequence parallel optimization.')
     group.add_argument('--ds-sequence-parallel-size', type=int, default=1,
                        help='Enable DeepSpeed\'s sequence parallel. Cannot be combined with "--sequence-parallel", which enables Megatron-LM\'s sequence parallel.')
+    group.add_argument('--force-ds-sequence-parallel', action='store_true',
+                       help='use DeepSpeed sequence parallelism regardless of sequence parallel size.')
     group.add_argument('--no-gradient-accumulation-fusion',
                        action='store_false',
                        help='Disable fusing gradient accumulation to weight '

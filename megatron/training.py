@@ -1429,7 +1429,7 @@ def build_train_valid_test_data_loaders(
                 args.eval_iters * args.global_batch_size
 
     # Data loader only on rank 0 of each model parallel group.
-    ds_sequence_parallel = mpu.get_sequence_parallel_world_size() > 1
+    ds_sequence_parallel = mpu.get_sequence_parallel_world_size() > 1 or args.force_ds_sequence_parallel
     rank_in_parallel_group = mpu.get_sequence_parallel_rank() if ds_sequence_parallel else mpu.get_tensor_model_parallel_rank()
     if rank_in_parallel_group == 0:
         # Build datasets.
