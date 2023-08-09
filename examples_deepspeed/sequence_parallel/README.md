@@ -1,24 +1,16 @@
 # Sequence Parallelism
 
-The examples in this folder explain the usage of [DeepSpeed's sequence parallelism](http://LINK_TO_BLOG_POST_OR_PAPER/).
+This folder contains examples that demonstrate how to use DeepSpeed's sequence parallelism.
 
-## Environment setup (FlashAttention)
+## Setting Up the Environment for FlashAttention
 
-Our sequence parallelism is designed to work with FlashAttention using Triton.
-Refer to the following steps for installation.
-Note that FlashAttention only supports Turing, Ampere, Ada, or Hopper GPUs.
+DeepSpeed's sequence parallelism is optimized for use with FlashAttention and Triton. Here are the installation steps and the versions we have tested. Note that FlashAttention is compatible only with Turing, Ampere, Ada, or Hopper GPUs.
 
 ```shell
-WORK_DIR=flash_attn_repro
-mkdir ${WORK_DIR} && cd ${WORK_DIR}
-python -m venv venv/flash_attn_repro
-source venv/flash_attn_repro/bin/activate
-pip install packaging
-
 # install triton
 git clone -b legacy-backend https://github.com/openai/triton
 cd triton/python/
-pip install cmake; # build-time dependency
+pip install cmake
 pip install .
 
 # install
@@ -28,27 +20,11 @@ cd flash-attention
 python setup.py install
 ```
 
-## How to enable Sequence Parallelism
+## Enabling Sequence Parallelism
 
-You can enable our sequence parallelim by setting the degree of parallelism to `--ds-sequence-parallel-size`.
-Note that tensor parallelism cannot be combined with this sequence parallelism.
-The number of attention heads must also be divisible this number.
+To enable sequence parallelism, set the degree of parallelism using the --ds-sequence-parallel-size argument. Ensure that the number of attention heads is divisible by this value.
+Ensure your model configuration is compliant with FlashAttention's requirements. For instance, to achieve optimal performance, the head size should be divisible by 8. Refer to the document of [FlashAttention](https://github.com/Dao-AILab/flash-attention/tree/v1.0.4) for more details.
 
-Please make sure your model configuration meets the requiments of FlashAttention. (For example, the head size must also be divisible by 8 for the best performance. See the document of [FlashAttention](https://github.com/Dao-AILab/flash-attention/tree/v1.0.4) for more details)
+Some working examples ([GPT1.3B](ds_pretrain_gpt_1.3B_seq_parallel.sh), [GPT30B](ds_pretrain_gpt_30B_seq_parallel.sh)), that enable sequence parallelism, are available in this foloder.
 
-You can find working examples ([GPT1.3B](ds_pretrain_gpt_1.3B_seq_parallel.sh), [GPT30B](ds_pretrain_gpt_30B_seq_parallel.sh)) that enable sequence parallelism in this foloder.
-
-# Benchmark results
-
-## GPT 30B (32 A100s on 4 nodes)
-
-The micro batch size was set to 1 and ZeRO stage 3 was enabled for all settings.
-The sequence parallel sizes were chosen to achieve best TFLOPS.
-
-| Sequence length | Global batch size | Sequence parallel size | TFLOPS |
-| --------------- | ----------------- | -----------------------| ------ |
-| 8k | 16 | 2 | 142 |
-| 16k | 8 | 4 | 135 |
-| 32k | 4 | 8 | 139 |
-| 64k | 2 | 16 | 133 |
-| 128k | 1 | 32 | 132 |
+Please note that our sequence parallelism feature is currently incompatible with Megatron-LM's tensor or pipeline parallelism.
