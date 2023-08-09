@@ -21,8 +21,12 @@ from megatron.model.utils import attention_mask_func, openai_gelu, erf_gelu
 import deepspeed
 from deepspeed.moe.layer import MoE
 from deepspeed.accelerator import get_accelerator
-from deepspeed.sequence.layer import DistributedAttention
 
+try:
+    from deepspeed.sequence.layer import DistributedAttention
+    dist_attn_supported = True
+except ImportError:
+    dist_attn_supported = False
 
 try:
     from einops import rearrange
@@ -585,6 +589,7 @@ class ParallelAttention(MegatronModule):
         self.enable_ds_sequence_parallel = parallel_state.get_sequence_parallel_world_size() > 1 \
                                            or args.force_ds_sequence_parallel
         if self.enable_ds_sequence_parallel:
+            assert dist_attn_supported, 'Distributed attention is not supported in this DeepSpeed version'
             assert args.num_attention_heads % parallel_state.get_sequence_parallel_world_size() == 0
             self.dist_attn = DistributedAttention(local_attn, parallel_state.get_sequence_parallel_group())
         else:
