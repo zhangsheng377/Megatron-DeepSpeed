@@ -37,8 +37,6 @@ try:
     # FlashAttention (1.x)
     from flash_attn.flash_attn_interface import flash_attn_unpadded_func
     from flash_attn.flash_attn_triton import flash_attn_func
-    from flash_attn.flash_blocksparse_attn_interface import convert_blockmask
-
 except ImportError:
     flash_attn_unpadded_func = None
     flash_attn_func = None
@@ -251,8 +249,9 @@ class CoreAttention(MegatronModule):
         projection_size = config.kv_channels * config.num_attention_heads
 
         # Per attention head and per partition values.
-        seq_parallel_world_size = parallel_state.get_sequence_parallel_world_size() \
-                if parallel_state.sequence_parallel_is_initialized() else 1
+        seq_parallel_world_size = 1
+        if parallel_state.sequence_parallel_is_initialized():
+            seq_parallel_world_size = parallel_state.get_sequence_parallel_world_size()
         world_size = seq_parallel_world_size if seq_parallel_world_size > 1 else parallel_state.get_tensor_model_parallel_world_size()
 
         self.hidden_size_per_partition = core.utils.divide(projection_size,

@@ -888,8 +888,6 @@ def _add_training_args(parser):
                        'https://arxiv.org/abs/2205.14135')
     group.add_argument('--use-flash-attn-triton', action='store_true',
                        help='use FlashAttention implementation of attention using Triton.')
-    group.add_argument('--use-block-sparse-attn', action='store_true',
-                       help='use block sparse attention.')
     group.add_argument('--disable-bias-linear', action='store_false',
                        help='Disable bias in the linear layers',
                        dest='add_bias_linear')
