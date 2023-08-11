@@ -3,7 +3,7 @@ dir=`pwd`
 ###############################################################################
 ### Main configs
 ## GPT-3 models use 2K sequence length/context window
-seq_len=8192
+seq_len=32768
 
 ## The "GPT-3 XXX" below are configs from GPT-3 paper
 ## https://arxiv.org/abs/2005.14165, choose based on
@@ -47,14 +47,14 @@ seq_len=8192
 # init_std=0.015
 
 ## GPT-3 XL 1.3B
-# model_size=1.3
-# num_layers=24
-# hidden_size=2048
-# num_attn_heads=16
-# global_batch_size=32
-# lr=2.0e-4
-# min_lr=1.0e-6
-# init_std=0.013
+model_size=1.3
+num_layers=24
+hidden_size=2048
+num_attn_heads=16
+global_batch_size=2
+lr=2.0e-4
+min_lr=1.0e-6
+init_std=0.013
 
 ## GPT-3 2.7B
 # model_size=2.7
@@ -85,16 +85,6 @@ seq_len=8192
 # lr=1.0e-4
 # min_lr=1.0e-6
 # init_std=0.008
-
-# GPT-3 30B
-model_size=30
-num_layers=64
-hidden_size=6144
-num_attn_heads=64
-global_batch_size=32
-lr=1.0e-4
-min_lr=1.0e-6
-init_std=0.008
 
 ## GPT-3 175B
 # model_size=175
@@ -141,10 +131,11 @@ lr_decay_style="cosine"
 ###############################################################################
 ### Parallelism configs
 ## Model parallelism, 1 is no MP
+## Currently we only support MP=1 with SP>1
 mp_size=1
 
 ## Sequence parallelism, 1 is no SP
-sp_size=8
+sp_size=4
 
 ## Pipeline parallelism. To disable PP, set pp_size to 1 and no_pp to true.
 ## Note that currently both curriculum learning and random-LTD are NOT
@@ -153,7 +144,7 @@ pp_size=1
 no_pp="true"
 
 ## ZeRO-based data parallelism, stage=0 will disable ZeRO
-zero_stage=3
+zero_stage=1
 
 ## Total number of GPUs. ds_ssh is from DeepSpeed library.
 num_gpus=$(($(ds_ssh nvidia-smi --query-gpu=name --format=csv,noheader | wc -l)-2))
@@ -222,7 +213,10 @@ if [[ $zero_stage -gt 0 ]]; then
     prescale_grad="false"
 fi
 if [[ $sp_size -gt 1 ]]; then
-    jobname="${jobname}_mp${sp_size}"
+    jobname="${jobname}_sp${sp_size}"
+fi
+if [[ $mp_size -gt 1 ]]; then
+    jobname="${jobname}_mp${mp_size}"
 fi
 if [ "${no_pp}" = "false" ]; then
     jobname="${jobname}_pp${pp_size}"
@@ -283,11 +277,11 @@ megatron_options=" \
     --load ${checkpoint_path} \
     --save ${checkpoint_path} \
     --no-async-tensor-model-parallel-allreduce \
+    --use-flash-attn-triton \
     --tensorboard-queue-size 1 \
     --log-timers-to-tensorboard \
     --log-batch-size-to-tensorboard \
     --log-validation-ppl-to-tensorboard \
-    --use-flash-attn-triton \
     --tensorboard-dir ${tensorboard_path}"
 
 if [ "${activation_checkpoint}" = "true" ]; then

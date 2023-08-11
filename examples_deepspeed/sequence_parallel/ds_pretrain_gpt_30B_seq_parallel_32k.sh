@@ -3,7 +3,7 @@ dir=`pwd`
 ###############################################################################
 ### Main configs
 ## GPT-3 models use 2K sequence length/context window
-seq_len=2048
+seq_len=32768
 
 ## The "GPT-3 XXX" below are configs from GPT-3 paper
 ## https://arxiv.org/abs/2005.14165, choose based on
@@ -47,14 +47,14 @@ seq_len=2048
 # init_std=0.015
 
 ## GPT-3 XL 1.3B
-model_size=1.3
-num_layers=24
-hidden_size=2048
-num_attn_heads=16
-global_batch_size=32
-lr=2.0e-4
-min_lr=1.0e-6
-init_std=0.013
+# model_size=1.3
+# num_layers=24
+# hidden_size=2048
+# num_attn_heads=16
+# global_batch_size=32
+# lr=2.0e-4
+# min_lr=1.0e-6
+# init_std=0.013
 
 ## GPT-3 2.7B
 # model_size=2.7
@@ -85,6 +85,16 @@ init_std=0.013
 # lr=1.0e-4
 # min_lr=1.0e-6
 # init_std=0.008
+
+# GPT-3 30B
+model_size=30
+num_layers=64
+hidden_size=6144
+num_attn_heads=64
+global_batch_size=2
+lr=1.0e-4
+min_lr=1.0e-6
+init_std=0.008
 
 ## GPT-3 175B
 # model_size=175
@@ -144,7 +154,7 @@ pp_size=1
 no_pp="true"
 
 ## ZeRO-based data parallelism, stage=0 will disable ZeRO
-zero_stage=1
+zero_stage=3
 
 ## Total number of GPUs. ds_ssh is from DeepSpeed library.
 num_gpus=$(($(ds_ssh nvidia-smi --query-gpu=name --format=csv,noheader | wc -l)-2))
@@ -158,7 +168,7 @@ dp_size=$(( ${num_gpus} / ${pp_size} / ${mp_size} / ${sp_size} ))
 ## Make sure that batch_size <= global_batch_size*pp_size*mp_size/num_gpus
 ## Reduce it manually if GPU OOM
 # batch_size=$(( ${global_batch_size} / ${dp_size} ))
-batch_size=2
+batch_size=1
 
 ###############################################################################
 ### Misc configs
