@@ -28,6 +28,12 @@ import subprocess
 from torch import nn
 import torch.nn.functional as F
 
+from dist import setup_torch
+setup_torch(
+    backend='deepspeed',
+    port='5432',
+)
+
 def model_provider(pre_process=True, post_process=True):
     """Build the model."""
 
@@ -36,7 +42,9 @@ def model_provider(pre_process=True, post_process=True):
 
     args = get_args()
     config = core_transformer_config_from_args(args)
-    with deepspeed.zero.Init(sequence_data_parallel_group=mpu.get_sequence_data_parallel_group(),
+    with deepspeed.zero.Init(
+                             data_parallel_group=mpu.get_data_parallel_group(),
+                            # sequence_data_parallel_group=mpu.get_sequence_data_parallel_group(),
                              remote_device=None if args.remote_device == 'none' else args.remote_device,
                              config_dict_or_path=args.deepspeed_config,
                              enabled=args.zero_stage == 3,
@@ -133,6 +141,11 @@ def get_batch(data_iterator):
     # For DS's sequence parallel
     seq_parallel_world_size = mpu.get_sequence_parallel_world_size() if mpu.sequence_parallel_is_initialized() else 1
     seq_parallel_world_rank = mpu.get_sequence_parallel_rank() if mpu.sequence_parallel_is_initialized() else 0
+
+    # For Megatron's sequence parallel
+    if args.sequence_parallel and args.zero_stage != 3:
+        seq_parallel_world_size = mpu.get_tensor_model_parallel_world_size()
+        seq_parallel_world_rank = mpu.get_tensor_model_parallel_rank()
     seq_length = tokens.size(1)
 
     assert seq_length % seq_parallel_world_size == 0
@@ -141,8 +154,11 @@ def get_batch(data_iterator):
     sub_seq_end = (seq_parallel_world_rank + 1) * sub_seq_length
 
     tokens = tokens[:, sub_seq_start:sub_seq_end]
-    labels = labels[:, sub_seq_start:sub_seq_end]
     position_ids = position_ids[:, sub_seq_start:sub_seq_end]
+    if args.sequence_parallel and args.zero_stage != 3:
+        labels = tokens_[:, 1:].contiguous()
+    elif mpu.sequence_parallel_is_initialized():
+        labels = labels[:, sub_seq_start:sub_seq_end]
 
     return tokens, labels, loss_mask, attention_mask, position_ids
 
