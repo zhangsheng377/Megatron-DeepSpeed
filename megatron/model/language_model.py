@@ -161,6 +161,7 @@ class Embedding(MegatronModule):
         # Position embedding (serial).
         self.add_position_embedding = args.add_position_embedding
         if self.add_position_embedding:
+            self._position_embeddings_key = 'position_embeddings'
             if args.sequence_parallel and args.zero_stage != 3:
                 self.position_embeddings = tensor_parallel.layers.SequenceParallelPositionEmbedding(
                     max_sequence_length, self.hidden_size)
@@ -169,7 +170,6 @@ class Embedding(MegatronModule):
             else:
                 self.position_embeddings = torch.nn.Embedding(
                     max_sequence_length, self.hidden_size)
-                self._position_embeddings_key = 'position_embeddings'
                 # Initialize the position embeddings.
                 if args.perform_initialization:
                     if args.zero_stage == 3:
@@ -259,7 +259,6 @@ class Embedding(MegatronModule):
             # embeddings = tensor_parallel.scatter_to_sequence_parallel_region(embeddings)
             with tensor_parallel.get_cuda_rng_tracker().fork():
                 embeddings = self.embedding_dropout(embeddings)
-                print(embeddings.shape)
         else:
             embeddings = self.embedding_dropout(embeddings)
 

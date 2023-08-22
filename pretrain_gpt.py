@@ -28,11 +28,6 @@ import subprocess
 from torch import nn
 import torch.nn.functional as F
 
-from dist import setup_torch
-setup_torch(
-    backend='deepspeed',
-    port='5432',
-)
 
 def model_provider(pre_process=True, post_process=True):
     """Build the model."""
