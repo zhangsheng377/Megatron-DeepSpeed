@@ -88,7 +88,7 @@ def validate_args(args, defaults={}):
             "pipeline_model_parallel_size must be 1 if pipeline parallel is disabled"
         
     if args.ds_sequence_parallel_size > 1:
-        assert version.parse(deepspeed.__version__) >= version.parse("0.10.1"), "sequence parallelism requires DeepSpeed version 0.10.1+"
+        assert version.parse(deepspeed.__version__) >= version.parse("0.10.2"), "sequence parallelism requires DeepSpeed version 0.10.2+"
 
     model_parallel_size = args.pipeline_model_parallel_size * \
                           args.tensor_model_parallel_size * \
