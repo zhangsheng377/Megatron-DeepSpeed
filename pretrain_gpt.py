@@ -149,6 +149,7 @@ def get_batch(data_iterator):
 
     tokens = tokens[:, sub_seq_start:sub_seq_end]
     position_ids = position_ids[:, sub_seq_start:sub_seq_end]
+    # For Megatron's sequence parallel, labels should not be partitioned
     if args.sequence_parallel and args.zero_stage != 3:
         labels = tokens_[:, 1:].contiguous()
     elif mpu.sequence_parallel_is_initialized():

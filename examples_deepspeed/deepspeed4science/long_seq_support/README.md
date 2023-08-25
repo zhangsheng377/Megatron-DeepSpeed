@@ -3,13 +3,13 @@
 We rebased and enabled DeepSpeed with the newest Megatron for long sequence support. This folder contains examples that demonstrate how to use new Megatron-DeepSpeed's sequence parallelism.
 
 ## Rebasing Efforts/Achievements
-- Enabling Megatron-LM's sequence parallel
-- Enabling rotary positional embedding
-- Enabling FlashAttention v1 and v2
-- Fix the conflicts related to activation checkpointing when DeepSpeed is used with the newest Megatron-LM since NVIDIA introduced some new fine-grained partial checkpointing techniques. DeepSpeed is not compatible with that.
+- Enabled Megatron-LM's sequence parallel
+- Enabled rotary positional embedding
+- Enabled FlashAttention v1 and v2
+- Fixed the conflicts related to activation checkpointing when DeepSpeed was used with the newest Megatron-LM since NVIDIA introduced some new fine-grained partial checkpointing techniques. DeepSpeed was not compatible with that
 - Major refactor to DeepSpeed pipeline parallelism implementation for GPT model in order to work with newest Megatron-LM
-- Fix model checkpoint save/load when DeepSpeed is used with the newest Megatron-LM
-- First generate attention mask on CPU memory and then move it into GPU memory to avoid out of memory error when large sequence length
+- Fixed model checkpoint save/load when DeepSpeed was used with the newest Megatron-LM
+- First generated attention mask on CPU memory and then moved it into GPU memory to avoid out of memory error when large sequence length
 - Split weights of position encoding across all GPUs when enabling sequence parallel
 - Fully verified the performance and correctness of GPT pretraining after rebasing
 
@@ -37,25 +37,14 @@ pip install -v --disable-pip-version-check --no-cache-dir --no-build-isolation -
 # install pybind11
 cd ../
 pip install pybind11
-```
 
-new Megatron-DeepSpeed's sequence parallelism can be combined with the following types of attention.
-
-- Classic attention
-- FlashAttention (enabled by `--use-flash-attn`)
-- FlashAttention + Triton (enabled by `--use-flash-attn-triton`)
-
-For the best performance, we recommend using FlashAttention + Triton. Here are the installation steps and the versions we have tested. Note that FlashAttention is compatible only with Turing, Ampere, Ada, or Hopper GPUs.
-
-```shell
-# install triton
+# install Triton-based FlashAttention
 git clone -b legacy-backend https://github.com/openai/triton
 cd triton/python/
 pip install cmake
 pip install .
 
-# install
-cd ${WORK_DIR}
+cd ../
 git clone -b v1.0.4 https://github.com/HazyResearch/flash-attention
 cd flash-attention
 python setup.py install
@@ -69,7 +58,7 @@ Some working examples ([GPT1.3B](pretrain_gpt_1.3B_seq_parallel.sh) [GPT30B](pre
 
 ## Max Sequence Length and Throughput Comparison between Old Megatron-DeepSpeed and New Megatron-DeepSpeed
 
-Experiments are performed on Argonne Leadership Computing Facility (ALCF) [ThetaGPU](https://www.alcf.anl.gov/support-center/training-assets/getting-started-theta-and-thetagpu) supercomputer. ThetaGPU is an NVIDIA DGX A100-based system. The DGX A100 comprises eight NVIDIA A100 GPUs. Due to the lack of FlashAttention and memory optimization. The max sequence length and throughput of old Megatron-DeepSpeed is quite limited. TP is short for tensor parallel. 
+Experiments are performed on 4 NVIDIA DGX A100-40GB nodes, connected through 8 HDR InfiniBand (200Gb/s per HDR). Due to the lack of FlashAttention and memory optimization. The max sequence length and throughput of old Megatron-DeepSpeed are quite limited. TP is short for tensor parallel. 
 
 | Sequence Length | Old Megatron-DeepSpeed  (TFLOPS) | New Megatron-DeepSpeed  (TFLOPS) |
 |-----------------|----------------------------------|----------------------------------|
@@ -81,3 +70,8 @@ Experiments are performed on Argonne Leadership Computing Facility (ALCF) [Theta
 | 64k             | OoM                              | 106 (TP size=32)                 |
 | 128k            | OoM                              | 119 (TP size=32)                 |
 | 256k            | OoM                              | 94 (TP size=32)                  |
+
+## Acknowledgements
+
+This research used resources of the Argonne Leadership Computing Facility, which is a DOE Office of Science User Facility supported under Contract DE-AC02-06CH11357.
+Especially, used Argonne Leadership Computing Facility (ALCF) [ThetaGPU](https://www.alcf.anl.gov/support-center/training-assets/getting-started-theta-and-thetagpu) supercomputer. 

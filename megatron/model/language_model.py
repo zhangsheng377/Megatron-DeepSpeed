@@ -162,7 +162,8 @@ class Embedding(MegatronModule):
         self.add_position_embedding = args.add_position_embedding
         if self.add_position_embedding:
             self._position_embeddings_key = 'position_embeddings'
-            if args.sequence_parallel and args.zero_stage != 3:
+            if args.sequence_parallel:
+                assert args.zero_stage != 3, "tensor model parallelism is not compatible zero_stage = 3"
                 self.position_embeddings = tensor_parallel.layers.SequenceParallelPositionEmbedding(
                     max_sequence_length, self.hidden_size)
                 # Initialize the position embeddings.
@@ -256,6 +257,7 @@ class Embedding(MegatronModule):
 
         # Dropout.
         if self.sequence_parallel:
+            # already partition sequence, do not need scatter_to_sequence_parallel_region
             # embeddings = tensor_parallel.scatter_to_sequence_parallel_region(embeddings)
             with tensor_parallel.get_cuda_rng_tracker().fork():
                 embeddings = self.embedding_dropout(embeddings)
