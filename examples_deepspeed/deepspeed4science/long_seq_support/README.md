@@ -58,7 +58,7 @@ Some working examples ([GPT1.3B](pretrain_gpt_1.3B_seq_parallel.sh) [GPT30B](pre
 
 ## Max Sequence Length and Throughput Comparison between Old Megatron-DeepSpeed and New Megatron-DeepSpeed
 
-Experiments are performed on 4 NVIDIA DGX A100-40GB nodes, connected through 8 HDR InfiniBand (200Gb/s per HDR). Due to the lack of FlashAttention and memory optimization. The max sequence length and throughput of old Megatron-DeepSpeed are quite limited. TP is short for tensor parallel. 
+Experiments are performed on 4 NVIDIA DGX A100-40GB nodes, connected through 8 HDR InfiniBand (200Gb/s per HDR). Due to the lack of FlashAttention and memory optimizations such as weights of position encoding partition, the max sequence length and throughput of old Megatron-DeepSpeed is quite limited. TP stands for tensor parallelism.
 
 | Sequence Length | Old Megatron-DeepSpeed  (TFLOPS) | New Megatron-DeepSpeed  (TFLOPS) |
 |-----------------|----------------------------------|----------------------------------|
@@ -73,5 +73,4 @@ Experiments are performed on 4 NVIDIA DGX A100-40GB nodes, connected through 8 H
 
 ## Acknowledgements
 
-This research used resources of the Argonne Leadership Computing Facility, which is a DOE Office of Science User Facility supported under Contract DE-AC02-06CH11357.
-Especially, used Argonne Leadership Computing Facility (ALCF) [ThetaGPU](https://www.alcf.anl.gov/support-center/training-assets/getting-started-theta-and-thetagpu) supercomputer. 
+We would like to thank Argonne National Laboratory (ANL) for providing us with access to their [ThetaGPU](https://www.alcf.anl.gov/support-center/training-assets/getting-started-theta-and-thetagpu) supercomputer for development and testing. The resources provided by ANL have been invaluable in helping us to conduct this work and achieve our goals.
