@@ -3,15 +3,15 @@
 We rebased and enabled DeepSpeed with the newest Megatron for long sequence support. This folder contains examples that demonstrate how to use new Megatron-DeepSpeed's sequence parallelism.
 
 ## Rebasing Efforts/Achievements
-- Enabled Megatron-LM's sequence parallel
-- Enabled rotary positional embedding
-- Enabled FlashAttention v1 and v2
-- Fixed the conflicts related to activation checkpointing when DeepSpeed was used with the newest Megatron-LM since NVIDIA introduced some new fine-grained partial checkpointing techniques. DeepSpeed was not compatible with that
-- Major refactor to DeepSpeed pipeline parallelism implementation for GPT model in order to work with newest Megatron-LM
-- Fixed model checkpoint save/load when DeepSpeed was used with the newest Megatron-LM
-- First generated attention mask on CPU memory and then moved it into GPU memory to avoid out of memory error when large sequence length
-- Split weights of position encoding across all GPUs when enabling sequence parallel
-- Fully verified the performance and correctness of GPT pretraining after rebasing
+- Enabled Megatron-LM's sequence parallel.
+- Enabled rotary positional embedding.
+- Enabled FlashAttention v1 and v2.
+- Fixed the conflicts related to activation checkpointing when DeepSpeed was used with the newest Megatron-LM since NVIDIA introduced some new fine-grained partial checkpointing techniques. DeepSpeed was not compatible with that.
+- Major refactor to DeepSpeed pipeline parallelism implementation for GPT model in order to work with newest Megatron-LM.
+- Fixed model checkpoint save/load when DeepSpeed was used with the newest Megatron-LM.
+- First generated attention mask on CPU memory and then moved it into GPU memory to avoid out of memory error when large sequence length.
+- Split weights of position encoding across all GPUs when enabling sequence parallel.
+- Fully verified the performance and correctness of GPT pretraining after rebasing.
 
 ## Setting Up the Virtual Environment
 
@@ -70,6 +70,8 @@ Experiments are performed on 4 NVIDIA DGX A100-40GB nodes, connected through 8 H
 | 64k             | OoM                              | 106 (TP size=32)                 |
 | 128k            | OoM                              | 119 (TP size=32)                 |
 | 256k            | OoM                              | 94 (TP size=32)                  |
+
+The new Megatron-DeepSpeed is able to support longer sequence lengths without triggering out-of-memory errors because it enables sequence parallelism, which partitions the activation memory when sequence lengths are massive, and also supports FlashAttention, which reduces the memory consumption of the attention map calculation from quadratic to linear complexity with respect to the sequence length. The new Megatron-DeepSpeed can achieve higher TFLPOS because it supports larger batch sizes without triggering out-of-memory errors. 
 
 ## Acknowledgements
 
