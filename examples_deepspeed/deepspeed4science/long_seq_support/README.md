@@ -1,16 +1,16 @@
 # Megatron Sequence Parallelism
 
-We rebased and enabled DeepSpeed with the newest Megatron for long sequence support. This folder contains examples that demonstrate how to use new Megatron-DeepSpeed's sequence parallelism.
+We rebased and enabled DeepSpeed with the latest Megatron repo for long sequence support. This folder contains examples that demonstrate how to use the new Megatron-DeepSpeed for training with long sequences.
 
 ## Rebasing Efforts/Achievements
 - Enabled Megatron-LM's sequence parallel.
 - Enabled rotary positional embedding.
 - Enabled FlashAttention v1 and v2.
-- Fixed the conflicts related to activation checkpointing when DeepSpeed was used with the newest Megatron-LM since NVIDIA introduced some new fine-grained partial checkpointing techniques. DeepSpeed was not compatible with that.
-- Major refactor to DeepSpeed pipeline parallelism implementation for GPT model in order to work with newest Megatron-LM.
+- Fixed the conflicts related to activation checkpointing when DeepSpeed was used with the newest Megatron-LM. NVIDIA introduced new fine-grained partial checkpointing technique, which DeepSpeed was not compatible with. Support for fine-grained checkpointing will be left as future work.
+- Major refactoring to DeepSpeed pipeline parallelism implementation for GPT model in order to work with newest Megatron-LM.
 - Fixed model checkpoint save/load when DeepSpeed was used with the newest Megatron-LM.
-- First generated attention mask on CPU memory and then moved it into GPU memory to avoid out of memory error when large sequence length.
-- Split weights of position encoding across all GPUs when enabling sequence parallel.
+- First generated attention mask on CPU memory and then moved it into GPU memory to avoid out of memory error when training with very large sequence lengths.
+- Split weights of position encoding across all GPUs when enabling sequence parallel to further reduce the memory footprint.
 - Fully verified the performance and correctness of GPT pretraining after rebasing.
 
 ## Setting Up the Virtual Environment
@@ -52,13 +52,14 @@ python setup.py install
 
 ## Enabling Sequence Parallelism
 
-To enable sequence parallelism, set `--sequence-parallel` argument. The the degree of sequence parallelism is equal to the degree of model tensor parallelism. Ensure that the sequence length is divisible by the degree of sequence parallelism. 
-Ensure your model configuration is compliant with FlashAttention's requirements. For instance, to achieve optimal performance, the head size should be divisible by 8. Refer to the document of [FlashAttention](https://github.com/Dao-AILab/flash-attention/tree/v1.0.4) for more details.
-Some working examples ([GPT1.3B](pretrain_gpt_1.3B_seq_parallel.sh) [GPT30B](pretrain_gpt_13B_seq_parallel.sh)) that enable sequence parallelism, are available in this foloder.
+To enable sequence parallelism, add the `--sequence-parallel` flag in the training script. We provide two training scripts for ([GPT1.3B](pretrain_gpt_1.3B_seq_parallel.sh) and [GPT30B](pretrain_gpt_13B_seq_parallel.sh)) that enable sequence parallelism, which are available in this foloder.
+
+By default, the degree of sequence parallelism is equal to the degree of model tensor parallelism. The users may also want to ensure that the sequence length is divisible by the degree of sequence parallelism to avoid performance penalties. 
+Please also ensure that your model dimension is compliant with FlashAttention's requirements. For instance, to achieve the optimal performance, the head size should be divisible by 8. Refer to the document of [FlashAttention](https://github.com/Dao-AILab/flash-attention/tree/v1.0.4) for more details.
 
 ## Max Sequence Length and Throughput Comparison between Old Megatron-DeepSpeed and New Megatron-DeepSpeed
 
-Experiments are performed on 4 NVIDIA DGX A100-40GB nodes, connected through 8 HDR InfiniBand (200Gb/s per HDR). Due to the lack of FlashAttention and memory optimizations such as weights of position encoding partition, the max sequence length and throughput of old Megatron-DeepSpeed is quite limited. TP stands for tensor parallelism.
+The following experiments are performed on 4 NVIDIA DGX A100-40GB nodes, connected through 8 HDR InfiniBand (200Gb/s per HDR). TP stands for tensor parallelism.
 
 | Sequence Length | Old Megatron-DeepSpeed  (TFLOPS) | New Megatron-DeepSpeed  (TFLOPS) |
 |-----------------|----------------------------------|----------------------------------|
@@ -71,7 +72,7 @@ Experiments are performed on 4 NVIDIA DGX A100-40GB nodes, connected through 8 H
 | 128k            | OoM                              | 119 (TP size=32)                 |
 | 256k            | OoM                              | 94 (TP size=32)                  |
 
-The new Megatron-DeepSpeed is able to support longer sequence lengths without triggering out-of-memory errors because it enables sequence parallelism, which partitions the activation memory when sequence lengths are massive, and also supports FlashAttention, which reduces the memory consumption of the attention map calculation from quadratic to linear complexity with respect to the sequence length. The new Megatron-DeepSpeed can achieve higher TFLPOS because it supports larger batch sizes without triggering out-of-memory errors. 
+The new Megatron-DeepSpeed is able to support longer sequence lengths without triggering out-of-memory errors because it enables sequence parallelism, which partitions the activation memory when sequence lengths are massive. The new Megatron-DeepSpeed supports FlashAttention, which reduces the memory consumption of the attention map calculation from quadratic to linear complexity with respect to the sequence length. It supports position embedding partitioning, which further reduces the memory consumption. The new Megatron-DeepSpeed can achieve higher TFLPOS because it includes new fused kernels from NVIDIA and supports larger batch sizes using the memory optimizations without triggering out-of-memory errors.
 
 ## Acknowledgements
 
