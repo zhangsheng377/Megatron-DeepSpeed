@@ -222,14 +222,10 @@ class SequenceParallelPositionEmbedding(torch.nn.Module):
 
     def __init__(self, sequence_length, embedding_dim):
         super(SequenceParallelPositionEmbedding, self).__init__()
-        sequence_length = sequence_length
-        embedding_dim = embedding_dim
-
         sequence_parallel_size = get_tensor_model_parallel_world_size()
         assert sequence_length % sequence_parallel_size == 0
         local_sequence_length = sequence_length // sequence_parallel_size
         self.offset = local_sequence_length * get_tensor_model_parallel_rank()
-
         self.local_embeddings = torch.nn.Embedding(
             local_sequence_length, embedding_dim)
 

@@ -128,11 +128,11 @@ def get_batch(data_iterator):
         skip_mask)
 
     # For DS's sequence parallel
-    seq_parallel_world_size = mpu.get_sequence_parallel_world_size() if mpu.sequence_parallel_is_initialized() else 1
-    seq_parallel_world_rank = mpu.get_sequence_parallel_rank() if mpu.sequence_parallel_is_initialized() else 0
+    seq_parallel_world_size = mpu.get_sequence_parallel_world_size()
+    seq_parallel_world_rank = mpu.get_sequence_parallel_rank()
 
     # For Megatron's sequence parallel
-    if args.sequence_parallel and args.zero_stage != 3:
+    if args.sequence_parallel:
         seq_parallel_world_size = mpu.get_tensor_model_parallel_world_size()
         seq_parallel_world_rank = mpu.get_tensor_model_parallel_rank()
     seq_length = tokens.size(1)
@@ -144,10 +144,8 @@ def get_batch(data_iterator):
 
     tokens = tokens[:, sub_seq_start:sub_seq_end]
     position_ids = position_ids[:, sub_seq_start:sub_seq_end]
-    # For Megatron's sequence parallel, labels should not be partitioned
-    if args.sequence_parallel and args.zero_stage != 3:
-        labels = tokens_[:, 1:].contiguous()
-    elif mpu.sequence_parallel_is_initialized():
+    # For DS's sequence parallel
+    if mpu.get_sequence_parallel_world_size() > 1:
         labels = labels[:, sub_seq_start:sub_seq_end]
 
     return tokens, labels, loss_mask, attention_mask, position_ids

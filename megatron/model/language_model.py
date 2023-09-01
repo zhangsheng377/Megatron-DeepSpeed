@@ -163,7 +163,6 @@ class Embedding(MegatronModule):
         if self.add_position_embedding:
             self._position_embeddings_key = 'position_embeddings'
             if args.sequence_parallel:
-                assert args.zero_stage != 3, "tensor model parallelism is not compatible zero_stage = 3"
                 self.position_embeddings = tensor_parallel.layers.SequenceParallelPositionEmbedding(
                     max_sequence_length, self.hidden_size)
                 # Initialize the position embeddings.
