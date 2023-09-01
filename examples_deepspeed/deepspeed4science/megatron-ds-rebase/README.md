@@ -1,6 +1,6 @@
-# Megatron-DeepSpeed Rebase
+# Megatron-DeepSpeed Rebase with Optimizations
 
-We rebased and enabled DeepSpeed with the latest Megatron repo. This folder contains examples that demonstrate how to use the new Megatron-DeepSpeed for training GPT like models with many new features.
+We rebased and enabled DeepSpeed with the latest Megatron repo. This folder contains examples that demonstrate how to use the new Megatron-DeepSpeed for training GPT like models with new features.
 
 ## Rebasing Efforts/Achievements
 New features:
