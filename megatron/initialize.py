@@ -23,6 +23,9 @@ from megatron.model.fused_bias_gelu import bias_gelu
 from megatron.utils import is_rank_0
 from deepspeed.accelerator import get_accelerator
 import deepspeed
+from deepspeed.ops.op_builder.builder import OpBuilder
+
+is_rocm_pytorch = OpBuilder.is_rocm_pytorch()
 
 
 def initialize_megatron(extra_args_provider=None, args_defaults={},
@@ -301,7 +304,7 @@ def set_jit_fusion_options():
     # flags required to enable jit fusion kernels
     TORCH_MAJOR = int(torch.__version__.split('.')[0])
     TORCH_MINOR = int(torch.__version__.split('.')[1])
-    if (TORCH_MAJOR > 1) or (TORCH_MAJOR == 1 and TORCH_MINOR >= 10):
+    if ((TORCH_MAJOR > 1) or (TORCH_MAJOR == 1 and TORCH_MINOR >= 10)) and not is_rocm_pytorch:
         # nvfuser
         torch._C._jit_set_profiling_executor(True)
         torch._C._jit_set_profiling_mode(True)

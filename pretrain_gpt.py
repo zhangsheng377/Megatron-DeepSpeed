@@ -37,8 +37,7 @@ def model_provider(pre_process=True, post_process=True):
 
     args = get_args()
     config = core_transformer_config_from_args(args)
-    with deepspeed.zero.Init(
-                             sequence_data_parallel_group=mpu.get_sequence_data_parallel_group(),
+    with deepspeed.zero.Init(sequence_data_parallel_group=mpu.get_sequence_data_parallel_group(),
                              remote_device=None if args.remote_device == 'none' else args.remote_device,
                              config_dict_or_path=args.deepspeed_config,
                              enabled=args.zero_stage == 3,
@@ -83,10 +82,6 @@ def model_provider(pre_process=True, post_process=True):
                 # https://github.com/kingoflolz/mesh-transformer-jax/
                 rotary_pos_emb = RotaryEmbedding(rotary_dim)(args.seq_length).to(
                     get_accelerator().current_device_name())
-                if args.fp16:
-                    rotary_pos_emb = rotary_pos_emb.half()
-                elif args.bf16:
-                    rotary_pos_emb = rotary_pos_emb.bfloat16()
                 args.rotary_pos_emb = rotary_pos_emb
 
         else:
