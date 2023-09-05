@@ -241,10 +241,6 @@ data_options=" \
 
 ## If CL is used, make sure to set "--split" the same as what you used during
 ## offline data analysis&indexing.
-# --train-tokens ${train_tokens} \
-# --train-samples ${train_samples} \
-# --load ${checkpoint_path} \
-# --save ${checkpoint_path} \
 megatron_options=" \
     --override-opt_param-scheduler \
     --adam-beta1 0.9 \
@@ -262,7 +258,8 @@ megatron_options=" \
     --num-attention-heads ${num_attn_heads} \
     --seq-length ${seq_len} \
     --max-position-embeddings ${seq_len} \
-    --train-iters 5 \
+    --train-tokens ${train_tokens} \
+    --train-samples ${train_samples} \
     --lr ${lr} \
     --min-lr ${min_lr} \
     --lr-decay-style ${lr_decay_style} \
@@ -277,6 +274,8 @@ megatron_options=" \
     --num-workers ${num_workers} \
     --fp16 \
     --seed ${seed} \
+    --load ${checkpoint_path} \
+    --save ${checkpoint_path} \
     --no-async-tensor-model-parallel-allreduce \
     --use-flash-attn-triton \
     --tensorboard-queue-size 1 \
@@ -331,20 +330,20 @@ fi
 ## When saving checkpoint to a storage with cache, their could be consistency
 ## issue of the pointer to latest checkpoint. Here we find the correct pointer
 ## and broadcast it to all nodes.
-# iteration_file="$checkpoint_path/latest_checkpointed_iteration.txt"
-# iteration_file_2="$checkpoint_path/latest"
-# iteration=0
-# for (( node = 0; node <= num_node-1; node++ ))
-# do
-#     if $(ssh -q worker-"$node" "test -f \"$iteration_file\""); then
-#         local_iteration=$(ssh -q worker-"$node" cat $iteration_file)
-#         iteration=$(( ${local_iteration} > ${iteration} ? ${local_iteration} :  ${iteration} ))
-#     fi
-# done
-# if [[ $iteration -gt 0 ]]; then
-#     iteration_2="global_step${iteration}"
-#     ds_ssh "echo $iteration > $iteration_file"
-#     ds_ssh "echo $iteration_2 > $iteration_file_2"
-# fi
+iteration_file="$checkpoint_path/latest_checkpointed_iteration.txt"
+iteration_file_2="$checkpoint_path/latest"
+iteration=0
+for (( node = 0; node <= num_node-1; node++ ))
+do
+    if $(ssh -q worker-"$node" "test -f \"$iteration_file\""); then
+        local_iteration=$(ssh -q worker-"$node" cat $iteration_file)
+        iteration=$(( ${local_iteration} > ${iteration} ? ${local_iteration} :  ${iteration} ))
+    fi
+done
+if [[ $iteration -gt 0 ]]; then
+    iteration_2="global_step${iteration}"
+    ds_ssh "echo $iteration > $iteration_file"
+    ds_ssh "echo $iteration_2 > $iteration_file_2"
+fi
 
 deepspeed ${dir}/../../../pretrain_gpt.py ${megatron_options} ${data_options} ${deepspeed_options} 2>&1 | tee ${log_path}/${jobname}_${host}_${current_time}.log
