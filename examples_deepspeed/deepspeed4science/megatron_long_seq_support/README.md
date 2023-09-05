@@ -10,12 +10,12 @@ New features:
 - Enabled new fused kernels from NVIDIA.
 
 New optimizations:
-- Enabled atttention map memory optimization, where we first generated attention mask on CPU memory and then moved it into GPU memory to avoid out of memory error when training with very large sequence lengths.
+- Enabled attention map memory optimization, where we first generated attention mask on CPU memory and then moved it into GPU memory to avoid out-of-memory errors when training with very large sequence lengths.
 - Position embedding partitioning, where we split weights of position encoding across all GPUs when enabling sequence parallel to further reduce the memory footprint.
 
 Resolved Issues:
 - Fixed the conflicts related to activation checkpointing when DeepSpeed was used with the newest Megatron-LM. NVIDIA introduced new fine-grained partial checkpointing technique, which DeepSpeed was not compatible with. Support for fine-grained checkpointing will be left as future work.
-- Major refactoring to DeepSpeed pipeline parallelism implementation for GPT model in order to work with newest Megatron-LM.
+- Major refactoring to DeepSpeed pipeline parallelism implementation for GPT model in order to work with the newest Megatron-LM.
 - Fixed model checkpoint save/load when DeepSpeed was used with the newest Megatron-LM.
 - Fully verified the performance and correctness of GPT pretraining after rebasing.
 
@@ -43,6 +43,28 @@ pip install -v --disable-pip-version-check --no-cache-dir --no-build-isolation -
 # install pybind11
 cd ../
 pip install pybind11
+```
+
+Megatron-DeepSpeed's sequence parallelism can be combined with the following types of attention.
+
+- Classic attention
+- FlashAttention version 1.x (enabled by `--use-flash-attn-v1`)
+- FlashAttention version 2.x (enabled by `--use-flash-attn-v2`)
+- FlashAttention + Triton (enabled by `--use-flash-attn-triton`)
+
+FlashAttention version 2.x may have numerical stability issues. For the best performance, we recommend using FlashAttention + Triton. 
+We show installation steps of thoes 3 types of FlashAttention
+
+```shell
+
+# install FlashAttention version 1.x
+pip install flash-attn==1.0.4
+
+# install FlashAttention version 2.x
+cd ../
+git clone https://github.com/Dao-AILab/flash-attention.git
+cd flash-attention
+python setup.py install
 
 # install Triton-based FlashAttention
 git clone -b legacy-backend https://github.com/openai/triton
