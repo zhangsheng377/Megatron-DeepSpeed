@@ -389,10 +389,8 @@ class FlashSelfAttention(torch.nn.Module):
         self.dropout_p = attention_dropout
 
         # Use FlashAttention-2 when args.use_flash_attn_v2 is True
-        # self.flash_attn_func = flash_attn_unpadded_func if flash_attn_varlen_func is None else flash_attn_varlen_func
         args = get_args()
         self.flash_attn_func = flash_attn_varlen_func if args.use_flash_attn_v2 else flash_attn_unpadded_func
-        print(self.flash_attn_func)
 
     def forward(self, q, k, v):
         """Implements the multihead softmax attention.
@@ -513,10 +511,6 @@ class ParallelAttention(MegatronModule):
                 assert flash_attn_varlen_func != None, "ImportError: cannot import flash_attn_varlen_func "
             if args.use_flash_attn_triton:
                 assert flash_attn_func != None, "ImportError: cannot import flash_attn_func "
-
-            # if flash_attn_unpadded_func is None and flash_attn_varlen_func is None and flash_attn_builder is None:
-            #     raise ImportError('FlashAttention is not installed, please install with '
-            #                       'pip install flash-attn or or implement your own flash attention')
 
             assert attention_type == AttnType.self_attn, ('FlashAttention code path only supports '
                                                           'self-attention for now')
