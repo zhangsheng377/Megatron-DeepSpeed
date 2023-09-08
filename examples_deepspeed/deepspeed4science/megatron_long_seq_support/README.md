@@ -104,4 +104,4 @@ The new Megatron-DeepSpeed is able to support longer sequence lengths without tr
 
 ## Acknowledgements
 
-We would like to thank Argonne National Laboratory (ANL) for providing us with access to their [ThetaGPU](https://www.alcf.anl.gov/support-center/training-assets/getting-started-theta-and-thetagpu) supercomputer for development and testing. The resources provided by ANL have been invaluable in helping us to conduct this work and achieve our goals.
+We would like to acknowledge the use of the supercomputing resources of the Argonne Leadership Computing Facility (ALCF), which is a DOE Office of Science User Facility supported under Contract DE-AC02-06CH11357.  The resources provided by ALCF(Argonne) have been invaluable in helping us to conduct this work and achieve our goals.
