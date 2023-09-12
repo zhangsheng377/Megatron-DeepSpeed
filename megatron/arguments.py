@@ -9,6 +9,7 @@ import os
 import torch
 import deepspeed
 import types
+from packaging import version
 
 import torch.nn.functional as F
 from megatron.global_vars import set_retro_args, get_retro_args
@@ -85,8 +86,13 @@ def validate_args(args, defaults={}):
     if args.no_pipeline_parallel:
         assert args.pipeline_model_parallel_size == 1, \
             "pipeline_model_parallel_size must be 1 if pipeline parallel is disabled"
+        
+    if args.ds_sequence_parallel_size > 1:
+        assert version.parse(deepspeed.__version__) >= version.parse("0.10.2"), "sequence parallelism requires DeepSpeed version 0.10.2+"
+
     model_parallel_size = args.pipeline_model_parallel_size * \
-                          args.tensor_model_parallel_size
+                          args.tensor_model_parallel_size * \
+                          args.ds_sequence_parallel_size
     assert args.world_size % model_parallel_size == 0, 'world size is not'\
         ' divisible by tensor parallel size ({}) times pipeline parallel ' \
         'size ({})'.format(args.world_size, args.tensor_model_parallel_size,
@@ -94,9 +100,11 @@ def validate_args(args, defaults={}):
     args.data_parallel_size = args.world_size // model_parallel_size
     if args.rank == 0:
         print('using world size: {}, data-parallel-size: {}, '
+              'sequence-parallel size: {}, '
               'tensor-model-parallel size: {}, '
               'pipeline-model-parallel size: {} '.format(
                   args.world_size, args.data_parallel_size,
+                  args.ds_sequence_parallel_size,
                   args.tensor_model_parallel_size,
                   args.pipeline_model_parallel_size), flush=True)
     if args.pipeline_model_parallel_size > 1:
@@ -264,17 +272,17 @@ def validate_args(args, defaults={}):
     for req_arg in required_args:
         _check_arg_is_not_none(args, req_arg)
 
-    # Checks.
+    # Checks.    
     if args.ffn_hidden_size is None:
-        args.ffn_hidden_size = 4 * args.hidden_size
-
-    if args.swiglu:
-        # reduce the dimnesion for MLP since projections happens on
-        # two linear layers. this keeps the number of paramters in
-        # the same ballpark as the counterpart with 4*h size
-        # we keep it a multiple of 64, which means the actual tensor size
-        # will be a multiple of 64 / tp_size
-        args.ffn_hidden_size = int((4 * args.hidden_size * 2 / 3) / 64) * 64
+        if args.swiglu:
+            # reduce the dimnesion for MLP since projections happens on
+            # two linear layers. this keeps the number of paramters in
+            # the same ballpark as the counterpart with 4*h size
+            # we keep it a multiple of 64, which means the actual tensor size
+            # will be a multiple of 64 / tp_size
+            args.ffn_hidden_size = int((4 * args.hidden_size * 2 / 3) / 64) * 64
+        else:
+            args.ffn_hidden_size = 4 * args.hidden_size
 
     if args.kv_channels is None:
         assert args.hidden_size % args.num_attention_heads == 0
@@ -878,6 +886,8 @@ def _add_training_args(parser):
     group.add_argument('--use-flash-attn', action='store_true',
                        help='use FlashAttention implementation of attention. '
                        'https://arxiv.org/abs/2205.14135')
+    group.add_argument('--use-flash-attn-triton', action='store_true',
+                       help='use FlashAttention implementation of attention using Triton.')
     group.add_argument('--disable-bias-linear', action='store_false',
                        help='Disable bias in the linear layers',
                        dest='add_bias_linear')
@@ -912,7 +922,11 @@ def _add_training_args(parser):
                        'check persist_ln_hidden_sizes if your hidden '
                        'size is supported.')
     group.add_argument('--sequence-parallel', action='store_true',
-                       help='Enable sequence parallel optimization.')
+                       help='Enable Megatron-LM\'s sequence parallel optimization.')
+    group.add_argument('--ds-sequence-parallel-size', type=int, default=1,
+                       help='Enable DeepSpeed\'s sequence parallel. Cannot be combined with "--sequence-parallel", which enables Megatron-LM\'s sequence parallel.')
+    group.add_argument('--force-ds-sequence-parallel', action='store_true',
+                       help='use DeepSpeed sequence parallelism regardless of sequence parallel size.')
     group.add_argument('--no-gradient-accumulation-fusion',
                        action='store_false',
                        help='Disable fusing gradient accumulation to weight '
@@ -1112,9 +1126,7 @@ def _add_distributed_args(parser):
                        default=False, help='If set, use custom-built ring exchange '
                        'for p2p communications. Note that this option will require '
                        'a custom built image that support ring-exchange p2p.')
-    group.add_argument('--local-rank', type=int, default=None,
-                       help='local rank passed from distributed launcher.')
-    group.add_argument('--local_rank', type=int, default=None,
+    group.add_argument('--local-rank', '--local_rank', type=int, default=None,
                        help='local rank passed from distributed launcher.')
     group.add_argument('--lazy-mpu-init', type=bool, required=False,
                        help='If set to True, initialize_megatron() '
