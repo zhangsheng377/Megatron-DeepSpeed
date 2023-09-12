@@ -1907,14 +1907,14 @@ class ParallelTransformer(MegatronModule):
                         if isinstance(hidden_states, tuple):
                             assert (len(hidden_states) == 2 or len(hidden_states) == 3)
                             if len(hidden_states) == 2:
-                                if not self.ds_inference:
-                                    hidden_states, moe_loss = hidden_states
-                                    moe_losses.append(moe_loss)
+                                #if not self.ds_inference:
+                                hidden_states, moe_loss = hidden_states
+                                moe_losses.append(moe_loss)
                             else:
                                 forward_kwargs["retriever_output"] = hidden_states[1]
-                                if not self.ds_inference:
-                                    hidden_states, _, moe_loss = hidden_states
-                                    moe_losses.append(moe_loss)
+                                #if not self.ds_inference:
+                                hidden_states, _, moe_loss = hidden_states
+                                moe_losses.append(moe_loss)
 
                 # Skip counter update for eval and activation checkpointing
                 if torch.is_grad_enabled() and self.training:

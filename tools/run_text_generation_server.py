@@ -77,13 +77,13 @@ if __name__ == "__main__":
     assert len(model) == 1, "Above condition should have caught this"
     model = model[0]
 
-    import pdb; pdb.set_trace()
+    #import pdb; pdb.set_trace()
 
     if args.ds_inference:
         model = ds_inference(model, args)
         print('> DeepSpeed Inference engine initialized')
 
-    import pdb; pdb.set_trace()
+    #import pdb; pdb.set_trace()
 
     if mpu.is_pipeline_first_stage() and mpu.get_tensor_model_parallel_rank() == 0:
         server = MegatronServer(model)

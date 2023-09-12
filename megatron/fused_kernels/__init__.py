@@ -25,9 +25,9 @@ def load(args):
         if int(bare_metal_major) >= 11:
             cc_flag.append('-gencode')
             cc_flag.append('arch=compute_80,code=sm_80')
-            if int(bare_metal_minor) >= 7:
-                cc_flag.append('-gencode')
-                cc_flag.append('arch=compute_90,code=sm_90')
+            #if int(bare_metal_minor) >= 7:
+                #cc_flag.append('-gencode')
+                #cc_flag.append('arch=compute_90,code=sm_90')
 
     # Build path
     srcpath = pathlib.Path(__file__).parent.absolute()
@@ -71,7 +71,7 @@ def load(args):
                                 '-U__CUDA_NO_HALF_CONVERSIONS__',
                                 '--expt-relaxed-constexpr',
                                 '--expt-extended-lambda']
-        
+
         # Upper triangular softmax.
         sources=[srcpath / 'scaled_upper_triang_masked_softmax.cpp',
                  srcpath / 'scaled_upper_triang_masked_softmax_cuda.cu']

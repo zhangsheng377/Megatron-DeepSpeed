@@ -77,6 +77,7 @@ class MixedFusedLayerNorm(torch.nn.Module):
 
     weight = self.weight + 1 if self.apply_layernorm_1p else self.weight
     # CPU path is here for unittest sake.
+    #import pdb; pdb.set_trace()
     if not input.is_cuda:
         print("WARNING! The input of FusedLayerNorm should be on the GPU."
               "This warning should only be triggered in the FusedLayerNorm unit tests.")
