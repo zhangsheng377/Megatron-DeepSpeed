@@ -3,22 +3,6 @@
 
 DIR=`pwd`
 DATETIME=`date +'date_%y-%m-%d_time_%H-%M-%S'`
-#mkdir -p $DIR/logs
-#mkdir -p /tmp/logs
-
-
-#DATASET_1="<PATH TO THE FIRST DATASET>"
-#DATASET_2="<PATH TO THE SECOND DATASET>"
-#DATASET_3="<PATH TO THE THIRD DATASET>"
-#DATASET="0.2 ${DATASET_1} 0.3 ${DATASET_2} 0.5 ${DATASET_3}"
-
-#BASE_DATA_PATH=tests/data/gpt2
-#DATASET=${BASE_DATA_PATH}/meg-gpt2-openwebtext_text_document
-#VOCAB_PATH=${BASE_DATA_PATH}/gpt2-tiny-vocab.json
-#MERGE_PATH=${BASE_DATA_PATH}/gpt2-tiny-merges.txt
-
-# BASE_DATA_PATH=/vc_data/Megatron-LM/data
-# DATASET=${BASE_DATA_PATH}/indexed_datasets/megatron
 BASE_DATA_PATH=datasets
 DATASET=${BASE_DATA_PATH}/my-gpt2_text_document
 VOCAB_PATH=${BASE_DATA_PATH}/gpt2-vocab.json
@@ -28,9 +12,7 @@ MERGE_PATH=${BASE_DATA_PATH}/gpt2-merges.txt
 script_path=$(realpath $0)
 script_dir=$(dirname $script_path)
 CONFIG_JSON="$script_dir/ds_config.json"
-#CONFIG_JSON="/tmp/ds_config.json"
 
-USE_DEEPSPEED=1
 ZERO_STAGE=1
 DTYPE="fp16"
 
@@ -55,20 +37,19 @@ PP=2
 DP=2
 WORLD_SIZE=$((TP*PP*DP))
 GLOBAL_BATCH=16
+MICRO_BATCH=$((GLOBAL_BATCH/WORLD_SIZE))
+TRAIN_ITERS=100000
+LR=6.0e-3
+MIN_LR=6.0e-4
 
 LOAD_TP=2
 LOAD_PP=2
 LOAD_DP=2
 RUN_TAG="uni_load${LOAD_TP}_${LOAD_PP}_${LOAD_DP}"
 
-
-MICRO_BATCH=$((GLOBAL_BATCH/WORLD_SIZE))
-TRAIN_ITERS=100000
-CHECKPOINT_PATH=checkpoints/gpt2/z${ZERO_STAGE}/$DTYPE/tp${TP}_pp${PP}_dp${DP}_${SIZE_TAG}
-LOAD_CHECKPOINT_PATH=checkpoints/gpt2/z${ZERO_STAGE}/$DTYPE/tp${LOAD_TP}_pp${LOAD_PP}_dp${LOAD_DP}_${SIZE_TAG}
-LR=6.0e-3
-MIN_LR=6.0e-4
-EXP_DIR="${HOME}/experiments/results/z${ZERO_STAGE}_uni_ckpt"
+EXP_DIR="z${ZERO_STAGE}_uni_ckpt" # "${HOME}/experiments/results/z${ZERO_STAGE}_uni_ckpt"
+CHECKPOINT_PATH=${EXP_DIR}/checkpoints/gpt2/z${ZERO_STAGE}/$DTYPE/tp${TP}_pp${PP}_dp${DP}_${SIZE_TAG}
+LOAD_CHECKPOINT_PATH=${EXP_DIR}/checkpoints/gpt2/z${ZERO_STAGE}/$DTYPE/tp${LOAD_TP}_pp${LOAD_PP}_dp${LOAD_DP}_${SIZE_TAG}
 LOG_DIR="${EXP_DIR}/tensorboard/tp${TP}_pp${PP}_dp${DP}_hd${HIDDEN}_nl${LAYERS}_gbsz${GLOBAL_BATCH}_mbsz${MICRO_BATCH}_z${ZERO_STAGE}_LR_${LR}_${MIN_LR}_${DTYPE}_${SIZE_TAG}_${RUN_TAG}"
 mkdir -p $LOG_DIR
 
@@ -76,10 +57,6 @@ while [[ $# -gt 0 ]]
 do
 key="$1"
 case $key in
-    --no-deepspeed)
-    USE_DEEPSPEED=0;
-    shift
-    ;;
     -z|--zero-stage)
     ZERO_STAGE=$2;
     shift
@@ -132,15 +109,12 @@ options=" \
         "
 
 
-if [[ ${USE_DEEPSPEED} -eq 1 ]]; then
-	echo "Using DeepSpeed"
-	options="${options} \
-		--deepspeed \
-		--deepspeed_config=${CONFIG_JSON} \
-		--zero-stage=${ZERO_STAGE} \
-		--deepspeed-activation-checkpointing \
-	"
-fi
+options="${options} \
+        --deepspeed \
+        --deepspeed_config=${CONFIG_JSON} \
+        --zero-stage=${ZERO_STAGE} \
+        --deepspeed-activation-checkpointing \
+"
 
 
 cat <<EOT > $CONFIG_JSON
@@ -171,9 +145,6 @@ cat <<EOT > $CONFIG_JSON
 EOT
 
 WORKER_STR="--num_nodes 1 --num_gpus $WORLD_SIZE"
-#WORKER_STR="-i worker-0:0,1,2,3"
-#run_cmd="deepspeed -i worker-0:0,1,2,3 ${DIR}/pretrain_gpt.py $@ ${options}"
-#run_cmd="deepspeed -i worker-0 ${DIR}/pretrain_gpt.py $@ ${options}"
 run_cmd="deepspeed --master_port 29700 $WORKER_STR ${DIR}/pretrain_gpt.py $@ ${options}"
 
 
