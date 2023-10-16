@@ -360,9 +360,13 @@ class EmbeddingPipe(Embedding):
 
     @property
     def word_embeddings_weight(self):
-        """Easy accessory for the DeepSpeed pipeline engine to tie embeddings across stages."""
+        """Easy accessory for the DeepSpeed pipeline engine to tie word embeddings across stages."""
         return self.word_embeddings.weight
 
+    @property
+    def position_embeddings_weight(self):
+        """Easy accessory for the DeepSpeed pipeline engine to tie position embeddings across stages."""
+        return self.position_embeddings.weight
 
 class TransformerLanguageModel(MegatronModule):
     """Transformer language model.

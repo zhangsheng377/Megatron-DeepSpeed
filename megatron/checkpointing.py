@@ -9,13 +9,24 @@ import numpy as np
 from deepspeed.accelerator import get_accelerator
 import torch
 
-from megatron import update_num_microbatches
+from megatron import update_num_microbatches, get_tokenizer
 from megatron.core import mpu, tensor_parallel
 from .global_vars import get_args
 from .utils import (unwrap_model,
                     print_rank_0,
                     is_rank_0)
 
+from deepspeed.checkpoint import (
+    ORIGINAL_VOCAB_SIZE,
+    PADDED_VOCAB_SIZE,
+    UNIVERSAL_CHECKPOINT_INFO,
+    UNIVERSAL_CHECKPOINT_VERSION_KEY,
+    UNIVERSAL_CHECKPOINT_VERSION_VALUE,
+    VOCABULARY_PARAMETER_PATTERNS,
+    PIPELINE_REPLICATED_PARAMETER_PATTERNS,
+    PARAMETER_TO_AVERAGE_PATTERNS,
+    PARAMETER_WITH_ROW_PARALLELISM_PATTERNS,
+)
 
 _CHECKPOINT_VERSION = None
 
@@ -62,14 +73,15 @@ def check_checkpoint_args(checkpoint_args):
     if args.vocab_file:
         _compare('max_position_embeddings')
         _compare('make_vocab_size_divisible_by')
-        _compare('padded_vocab_size')
+        if not args.universal_checkpoint:
+            _compare('padded_vocab_size')
         _compare('tokenizer_type')
     if args.data_parallel_random_init:
         _compare('data_parallel_random_init')
-    if get_checkpoint_version() < 3.0:
-        _compare('tensor_model_parallel_size',
+    if get_checkpoint_version() < 3.0 and not args.universal_checkpoint:
+        _compare('tensor_model_parallel_size',      
                  old_arg_name='model_parallel_size')
-    if get_checkpoint_version() >= 3.0:
+    if get_checkpoint_version() >= 3.0 and not args.universal_checkpoint:
         _compare('tensor_model_parallel_size')
         _compare('pipeline_model_parallel_size')
 
@@ -248,6 +260,8 @@ def save_checkpoint(iteration, model, optimizer, opt_param_scheduler):
         state_dict['checkpoint_version'] = 3.0
         state_dict['iteration'] = iteration
         state_dict['tokens'] = args.consumed_train_tokens
+        state_dict['checkpoint_info'] = _checkpoint_info()
+        state_dict[UNIVERSAL_CHECKPOINT_INFO] = _universal_checkpoint_info()
 
         # DeepSpeed saves the model/optimizer/scheduler
         if not args.deepspeed:
@@ -543,7 +557,7 @@ def load_checkpoint(model, optimizer, opt_param_scheduler, load_arg='load', stri
             print_rank_0('    will not load any checkpoints and will start from '
                         'random')
             return 0
-        release = False
+        release = False        
     else:
         model = unwrap_model(model)
 
@@ -692,6 +706,10 @@ def load_checkpoint(model, optimizer, opt_param_scheduler, load_arg='load', stri
     print_rank_0(f'  successfully loaded checkpoint from {args.load} '
                  f'at iteration {iteration}')
 
+    from .utils import dump_weights, dump_position_embed_weights
+    dump_weights(f'{args.universal_checkpoint=}', iteration, model, optimizer)
+    dump_position_embed_weights("init", 0, model)
+
     return iteration
 
 
@@ -736,3 +754,56 @@ def load_biencoder_checkpoint(model, only_query_model=False,
         print(' successfully loaded {}'.format(checkpoint_name))
 
     return model
+
+
+def _checkpoint_info():
+    args = get_args()
+    tokenizer = get_tokenizer()
+
+    return {
+        "padded_vocab_size": args.padded_vocab_size,
+        "original_vocab_size": tokenizer.vocab_size,
+    }
+
+def _universal_checkpoint_info():
+    args = get_args()
+    tokenizer = get_tokenizer()
+
+    info = dict()
+    info[UNIVERSAL_CHECKPOINT_VERSION_KEY] = UNIVERSAL_CHECKPOINT_VERSION_VALUE
+    info[ORIGINAL_VOCAB_SIZE] = tokenizer.vocab_size
+    info[PADDED_VOCAB_SIZE] = args.padded_vocab_size
+
+    # Vocabulary parameters (embeddings) that require special handling due to padding.
+    info[VOCABULARY_PARAMETER_PATTERNS] = [
+        r"tied_modules.embed.word_embeddings.weight"
+    ]
+
+    # Replicated (shared) parameters on the pipeline dimension 
+    info[PIPELINE_REPLICATED_PARAMETER_PATTERNS] = [
+        r"tied_modules.embed.word_embeddings.weight", 
+        r"tied_modules.embed.position_embeddings.weight"
+    ]
+
+    # Parameter slices that should be averaged not concatenated. 
+    info[PARAMETER_TO_AVERAGE_PATTERNS] = [
+        r"tied_modules.embed.word_embeddings.norm.weight",
+        r"tied_modules.embed.word_embeddings.norm.bias",
+        r"tied_modules.embed.position_embeddings.weight",
+        r"\d+.input_layernorm.weight",
+        r"\d+.input_layernorm.bias",
+        r"\d+.post_attention_layernorm.weight",
+        r"\d+.post_attention_layernorm.bias",
+        r"\d+.self_attention.dense.bias",
+        r"\d+.mlp.dense_4h_to_h.bias",
+        r"\d+.weight",
+        r"\d+.bias",
+    ]
+
+    # Parameter that are sliced on the row dimension
+    info[PARAMETER_WITH_ROW_PARALLELISM_PATTERNS] = [
+        r"\d+.mlp.dense_4h_to_h.weight",
+        r"\d+.mlp.self_attention.dense.weight",
+    ]
+
+    return info 
