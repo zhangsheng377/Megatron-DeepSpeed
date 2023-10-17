@@ -105,6 +105,7 @@ options=" \
 	--exit-interval ${EXIT_INTERVAL} \
         --save ${CHECKPOINT_PATH} \
         --load ${LOAD_CHECKPOINT_PATH} \
+        --make-vocab-size-divisible-by 256 \
 	--tensorboard-dir $LOG_DIR
         "
 
@@ -140,7 +141,7 @@ cat <<EOT > $CONFIG_JSON
     "initial_scale_power": 12
   },
 
-  "wall_clock_breakdown" : true
+  "wall_clock_breakdown" : false
 }
 EOT
 

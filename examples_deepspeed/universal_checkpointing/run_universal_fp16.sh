@@ -32,9 +32,9 @@ else
         SIZE_TAG="big"
 fi  
 
-TP=2
-PP=2
-DP=2
+TP=1
+PP=1
+DP=1
 WORLD_SIZE=$((TP*PP*DP))
 GLOBAL_BATCH=16
 MICRO_BATCH=$((GLOBAL_BATCH/WORLD_SIZE))
@@ -45,7 +45,7 @@ MIN_LR=6.0e-4
 LOAD_TP=2
 LOAD_PP=2
 LOAD_DP=2
-RUN_TAG="uni_load${LOAD_TP}_${LOAD_PP}_${LOAD_DP}"
+RUN_TAG="uni_vocab256_load${LOAD_TP}_${LOAD_PP}_${LOAD_DP}"
 
 EXP_DIR="z${ZERO_STAGE}_uni_ckpt" # "${HOME}/experiments/results/z${ZERO_STAGE}_uni_ckpt"
 CHECKPOINT_PATH=${EXP_DIR}/checkpoints/gpt2/z${ZERO_STAGE}/$DTYPE/tp${TP}_pp${PP}_dp${DP}_${SIZE_TAG}
@@ -104,6 +104,7 @@ options=" \
 	--exit-interval ${EXIT_INTERVAL} \
         --save ${CHECKPOINT_PATH} \
         --load ${LOAD_CHECKPOINT_PATH} \
+        --make-vocab-size-divisible-by 256 \
         --universal-checkpoint \
 	--tensorboard-dir $LOG_DIR
         "
@@ -140,7 +141,7 @@ cat <<EOT > $CONFIG_JSON
     "initial_scale_power": 12
   },
 
-  "wall_clock_breakdown" : true
+  "wall_clock_breakdown" : false
 }
 EOT
 
