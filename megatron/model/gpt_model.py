@@ -235,7 +235,6 @@ class GPTModelPipe(PipelineModule,MegatronModule):
                                             num_tokentypes=num_tokentypes,
                                             embedding_weights_in_fp32=args.embedding_weights_in_fp32,
                                             tied_weight_attr=['word_embeddings_weight']))
-                                            # tied_weight_attr=['word_embeddings_weight', 'position_embeddings_weight']))
 
         for layer_idx in range(args.num_layers):
             self.specs.append(
@@ -276,7 +275,6 @@ class GPTModelPipe(PipelineModule,MegatronModule):
                               embedding_weights_in_fp32=args.embedding_weights_in_fp32,
                               forward_fn=_logits_helper,
                               tied_weight_attr=['word_embeddings_weight'])
-                            #   tied_weight_attr=['word_embeddings_weight', 'position_embeddings_weight'])
             )
 
         # Convert to fp32 if needed
