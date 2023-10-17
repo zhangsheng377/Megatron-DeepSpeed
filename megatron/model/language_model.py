@@ -362,7 +362,6 @@ class EmbeddingPipe(Embedding):
     def word_embeddings_weight(self):
         """Easy accessory for the DeepSpeed pipeline engine to tie embeddings across stages."""
         return self.word_embeddings.weight
-
     
 class TransformerLanguageModel(MegatronModule):
     """Transformer language model.
