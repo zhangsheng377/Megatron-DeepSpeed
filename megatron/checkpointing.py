@@ -705,9 +705,9 @@ def load_checkpoint(model, optimizer, opt_param_scheduler, load_arg='load', stri
     print_rank_0(f'  successfully loaded checkpoint from {args.load} '
                  f'at iteration {iteration}')
 
-    from .utils import dump_weights, dump_position_embed_weights
-    dump_weights(f'{args.universal_checkpoint=}', iteration, model, optimizer)
-    dump_position_embed_weights("init", 0, model)
+    # from .utils import dump_weights, dump_position_embed_weights
+    # dump_weights(f'{args.universal_checkpoint=}', iteration, model, optimizer)
+    # dump_position_embed_weights("init", 0, model)
 
     return iteration
 
