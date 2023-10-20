@@ -632,8 +632,6 @@ def setup_model_and_optimizer(model_provider_func,
     else:
         model[0].global_steps = student_global_steps
 
-    # quit()
-
     # We only support local DDP with multiple micro-batches.
     if len(model) > 1 or mpu.get_pipeline_model_parallel_world_size() > 1:
         assert args.DDP_impl == 'local'
