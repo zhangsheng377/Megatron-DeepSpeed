@@ -658,9 +658,6 @@ def train_step(forward_step_func, data_iterator,
     args = get_args()
     timers = get_timers()
 
-    # from .utils import dump_weights, dump_position_embed_weights
-    # dump_position_embed_weights("before", args.iteration, model)
-
     if args.deepspeed and args.ds_pipeline_enabled:
         skipped_iter = 0
         num_zeros_in_grad = 0
