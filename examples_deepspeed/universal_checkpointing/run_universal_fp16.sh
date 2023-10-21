@@ -32,9 +32,9 @@ else
         SIZE_TAG="big"
 fi  
 
-TP=1
-PP=1
-DP=1
+TP=2
+PP=2
+DP=2
 WORLD_SIZE=$((TP*PP*DP))
 GLOBAL_BATCH=16
 MICRO_BATCH=$((GLOBAL_BATCH/WORLD_SIZE))
@@ -45,9 +45,9 @@ MIN_LR=6.0e-4
 LOAD_TP=2
 LOAD_PP=2
 LOAD_DP=2
-RUN_TAG="uni_vocab256_load${LOAD_TP}_${LOAD_PP}_${LOAD_DP}"
+RUN_TAG="uni_load${LOAD_TP}_${LOAD_PP}_${LOAD_DP}"
 
-EXP_DIR="z${ZERO_STAGE}_uni_ckpt" # "${HOME}/experiments/results/z${ZERO_STAGE}_uni_ckpt"
+EXP_DIR="z${ZERO_STAGE}_uni_ckpt" 
 CHECKPOINT_PATH=${EXP_DIR}/checkpoints/gpt2/z${ZERO_STAGE}/$DTYPE/tp${TP}_pp${PP}_dp${DP}_${SIZE_TAG}
 LOAD_CHECKPOINT_PATH=${EXP_DIR}/checkpoints/gpt2/z${ZERO_STAGE}/$DTYPE/tp${LOAD_TP}_pp${LOAD_PP}_dp${LOAD_DP}_${SIZE_TAG}
 LOG_DIR="${EXP_DIR}/tensorboard/tp${TP}_pp${PP}_dp${DP}_hd${HIDDEN}_nl${LAYERS}_gbsz${GLOBAL_BATCH}_mbsz${MICRO_BATCH}_z${ZERO_STAGE}_LR_${LR}_${MIN_LR}_${DTYPE}_${SIZE_TAG}_${RUN_TAG}"
