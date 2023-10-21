@@ -632,8 +632,6 @@ def setup_model_and_optimizer(model_provider_func,
     else:
         model[0].global_steps = student_global_steps
 
-    # quit()
-
     # We only support local DDP with multiple micro-batches.
     if len(model) > 1 or mpu.get_pipeline_model_parallel_world_size() > 1:
         assert args.DDP_impl == 'local'
@@ -659,9 +657,6 @@ def train_step(forward_step_func, data_iterator,
     """Single training step."""
     args = get_args()
     timers = get_timers()
-
-    # from .utils import dump_weights, dump_position_embed_weights
-    # dump_position_embed_weights("before", args.iteration, model)
 
     if args.deepspeed and args.ds_pipeline_enabled:
         skipped_iter = 0
