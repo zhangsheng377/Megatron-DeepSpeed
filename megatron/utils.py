@@ -367,19 +367,3 @@ def dump_weights(preamble, iteration, model, optimizer, tensor=None):
                 p = model[0].module.tied_modules.embed.word_embeddings.weight._hp_param
                 fh.write(f"{get_fingerprint(p)} module.tied_modules.embed.word_embeddings.weight._hp_param {p.shape}\n")
 
-        # for i, param_group in enumerate(optimizer.param_groups):
-        #     fh.write(f"{get_fingerprint(optimizer.fp32_groups_flat_partition[i])} group={i}\n")
-            #fh.write(f"{i}={optimizer.fp32_groups_flat_partition[i]}\n")
-    #     if mpu.is_pipeline_first_stage():
-    #         x = optimizer.fp32_groups_flat_partition[0]
-    #         fh.write(f"fp32={x[:402432]}\n")
-    #     if mpu.is_pipeline_last_stage()):
-    #         x = optimizer.fp32_groups_flat_partition[1]
-    #         fh.write(f"fp32={x[-402432:]}\n")
-
-    # import os
-    # import socket
-    # hostname = socket.gethostname()
-    # pid = os.getpid()
-    # global_rank = torch.distributed.get_rank()
-    #fn = f"debug-{iteration}-pp{pp_rank}-tp{tp_rank}-dp{dp_rank}-global{global_rank}-{preamble}-{pid}.txt"

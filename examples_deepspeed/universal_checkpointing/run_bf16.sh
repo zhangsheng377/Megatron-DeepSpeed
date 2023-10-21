@@ -14,7 +14,7 @@ script_dir=$(dirname $script_path)
 CONFIG_JSON="$script_dir/ds_config.json"
 
 ZERO_STAGE=1
-DTYPE="fp16"
+DTYPE="bf16"
 
 # Debug
 DEBUG_MODE=1
@@ -131,16 +131,11 @@ cat <<EOT > $CONFIG_JSON
   },
 
   "bf16": {
-    "enabled": false
+    "enabled": true
   },
 
-  "fp16": {
-    "enabled": true,
-    "loss_scale": 0,
-    "loss_scale_window": 50,
-    "hysteresis": 2,
-    "min_loss_scale": 1,
-    "initial_scale_power": 12
+  "data_types": {
+        "grad_accum_dtype": "fp32" 
   },
 
   "wall_clock_breakdown" : false
