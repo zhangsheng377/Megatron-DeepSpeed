@@ -10,13 +10,13 @@ SEQ_LEN=2048
 ### your desired model size or build your own configs
 
 ## GPT-3 Small 125M
-# MODEL_SIZE=0.125
-# NUM_LAYERS=12
-# HIDDEN_SIZE=768
-# NUM_ATTN_HEADS=12
-# GLOBAL_BATCH_SIZE=256
-# LR=6.0e-4
-# MIN_LR=6.0e-5
+MODEL_SIZE=0.125
+NUM_LAYERS=12
+HIDDEN_SIZE=768
+NUM_ATTN_HEADS=12
+GLOBAL_BATCH_SIZE=256
+LR=6.0e-4
+MIN_LR=6.0e-5
 
 ## GPT-3 Medium 350M
 # MODEL_SIZE=0.35
@@ -37,13 +37,13 @@ SEQ_LEN=2048
 # MIN_LR=2.5e-5
 
 ## GPT-3 XL 1.3B
-MODEL_SIZE=1.3
-NUM_LAYERS=24
-HIDDEN_SIZE=2048
-NUM_ATTN_HEADS=16
-GLOBAL_BATCH_SIZE=512
-LR=2.0e-4
-MIN_LR=2.0e-5
+# MODEL_SIZE=1.3
+# NUM_LAYERS=24
+# HIDDEN_SIZE=2048
+# NUM_ATTN_HEADS=16
+# GLOBAL_BATCH_SIZE=512
+# LR=2.0e-4
+# MIN_LR=2.0e-5
 
 ## GPT-3 2.7B
 # MODEL_SIZE=2.7
@@ -113,13 +113,13 @@ LR_DECAY_TOKENS=260000000000
 BATCH_SIZE=2
 
 ## Model parallelism, 1 is no MP
-MP_SIZE=4
+MP_SIZE=1
 
 ## Pipeline parallelism
 ## Currently we don't support PP for MoE. To disable PP, set PP_SIZE
 ## to 1 and use the "--no-pipeline-parallel" arg.
 PP_SIZE=1
-NUM_GPUS=64
+NUM_GPUS=16
 ###############################################################################
 ### MoE configs
 ## Number of experts. EP_SIZE 1 means dense model without MoE
@@ -166,7 +166,7 @@ CL_TOKENS=$((${CL_TOKENS} * 1000000000))
 CL_STEP=$(( ${CL_TOKENS} / (${GLOBAL_BATCH_SIZE} * ${CL_AVG_SEQLEN}) ))
 ###############################################################################
 ### Misc configs
-LOG_INTERVAL=10
+LOG_INTERVAL=1
 EVAL_ITERS=10
 EVAL_INTERVAL=100
 SAVE_INTERVAL=1000
@@ -239,10 +239,10 @@ if [ "${USE_INTERNAL_DATA}" = "true" ]; then
     0.00208 ${NIH} 0.13017 ${CC2020} 0.09446 ${PCC} 0.15652 ${CC2021} \
     0.01359 ${ARX} 0.01588 ${GIT}"
 else
-    VOCAB_PATH=/data/the_pile_public_merged_nopreprocessing/gpt2-vocab.json
-    MERGE_PATH=/data/the_pile_public_merged_nopreprocessing/gpt2-merges.txt
+    VOCAB_PATH=/data/users/guanhua/Megatron-DeepSpeed/dataset/gpt2-vocab.json
+    MERGE_PATH=/data/users/guanhua/Megatron-DeepSpeed/dataset/gpt2-merges.txt
     # Public the Pile dataset, can be downloaded at https://mystic.the-eye.eu/public/AI/pile_neox/
-    DATA_BLEND=/data/the_pile_public_merged_nopreprocessing/pile_text_document
+    DATA_BLEND=/data/users/guanhua/Megatron-DeepSpeed/dataset/BookCorpusDataset_text_document
 fi
 ###############################################################################
 data_options=" \
@@ -293,6 +293,9 @@ megatron_options=" \
         --save ${CHECKPOINT_PATH} \
         --tensorboard-queue-size 1 \
         --log-timers-to-tensorboard \
+        --timing-log-level 1 \
+        --no-pipeline-parallel \
+        --cpu-optimizer \
         --log-batch-size-to-tensorboard \
         --log-validation-ppl-to-tensorboard \
         --tensorboard-dir ${TENSORBOARD_DIR}"
@@ -312,15 +315,15 @@ megatron_options="${megatron_options} \
         --disable-moe-token-dropping"
 fi
 
-template_json="ds_config_gpt_TEMPLATE.json"
+template_json="ds_config_gpt_Zero2_TEMPLATE.json"
 config_json="ds_config_gpt_${NAME}.json"
 sed "s/CONFIG_BATCH_SIZE/${GLOBAL_BATCH_SIZE}/" ${template_json} \
     | sed "s/CONFIG_MBSIZE/${BATCH_SIZE}/" \
     | sed "s/LOG_INTERVAL/${LOG_INTERVAL}/" \
-    | sed "s/ZERO_STAGE/0/" \
+    | sed "s/ZERO_STAGE/2/" \
     | sed "s/PRESCALE_GRAD/true/" \
-    | sed "s/CONFIG_FP16_ENABLED/true/" \
-    | sed "s/CONFIG_BF16_ENABLED/false/" \
+    | sed "s/CONFIG_FP16_ENABLED/false/" \
+    | sed "s/CONFIG_BF16_ENABLED/true/" \
     | sed "s/CONFIG_CL_ENABLED/${CL_ENABLED}/" \
     | sed "s/CONFIG_CL_MIN/${CL_START_SEQLEN}/" \
     | sed "s/CONFIG_CL_MAX/${SEQ_LEN}/" \
