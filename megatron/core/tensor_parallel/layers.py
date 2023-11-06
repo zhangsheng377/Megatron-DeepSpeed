@@ -502,8 +502,9 @@ class ColumnParallelLinear(torch.nn.Module):
                  keep_master_weight_for_test=False,
                  skip_bias_add=False,
                  skip_weight_param_allocation: bool=False,
-                 moe=False, enable_expert_tensor_parallelism=False):
-        super(ColumnParallelLinear, self).__init__()
+                 moe=False, enable_expert_tensor_parallelism=False,
+                 dtype=None):
+        torch.nn.Module.__init__(self)
 
         # Keep input parameters
         self.input_size = input_size
@@ -519,6 +520,7 @@ class ColumnParallelLinear(torch.nn.Module):
         self.output_size_per_partition = divide(output_size, world_size)
         self.skip_bias_add = skip_bias_add
         self.config = config
+        dtype = config.params_dtype if dtype is None else dtype
 
         # Parameters.
         # Note: torch.nn.functional.linear performs XA^T + b and as a result
@@ -528,7 +530,7 @@ class ColumnParallelLinear(torch.nn.Module):
             if config.use_cpu_initialization:
                 self.weight = Parameter(torch.empty(self.output_size_per_partition,
                                                     self.input_size,
-                                                    dtype=config.params_dtype))
+                                                    dtype=dtype))
                 if config.perform_initialization:
                     self.master_weight = _initialize_affine_weight_cpu(
                         self.weight, self.output_size, self.input_size,
@@ -537,7 +539,7 @@ class ColumnParallelLinear(torch.nn.Module):
             else:
                 self.weight = Parameter(torch.empty(
                     self.output_size_per_partition, self.input_size,
-                    device=get_accelerator().current_device_name(), dtype=config.params_dtype))
+                    device=get_accelerator().current_device_name(), dtype=dtype))
                 if config.perform_initialization:
                     _initialize_affine_weight_gpu(self.weight, init_method,
                                                   partition_dim=0, stride=stride)
@@ -547,12 +549,12 @@ class ColumnParallelLinear(torch.nn.Module):
         if bias:
             if config.use_cpu_initialization:
                 self.bias = Parameter(torch.empty(
-                    self.output_size_per_partition, dtype=config.params_dtype))
+                    self.output_size_per_partition, dtype=dtype))
             else:
                 self.bias = Parameter(torch.empty(
                     self.output_size_per_partition,
                     device=get_accelerator().current_device_name(),
-                    dtype=config.params_dtype))
+                    dtype=dtype))
             set_tensor_model_parallel_attributes(self.bias, True, 0, stride)
             if config.perform_initialization:
                 # Always initialize bias to zero.
@@ -690,8 +692,9 @@ class RowParallelLinear(torch.nn.Module):
                  stride: int = 1,
                  keep_master_weight_for_test: bool = False,
                  skip_bias_add: bool = False,
-                 moe=False, enable_expert_tensor_parallelism=False):
-        super(RowParallelLinear, self).__init__()
+                 moe=False, enable_expert_tensor_parallelism=False,
+                 dtype=None):
+        torch.nn.Module.__init__(self)
 
         # Keep input parameters
         self.input_size = input_size
@@ -710,6 +713,7 @@ class RowParallelLinear(torch.nn.Module):
         self.sequence_parallel = config.sequence_parallel
         if self.sequence_parallel and not self.input_is_parallel:
             raise RuntimeError("To enable `sequence_parallel`, `input_is_parallel` must be `True`")
+        dtype = config.params_dtype if dtype is None else dtype
 
         # Parameters.
         # Note: torch.nn.functional.linear performs XA^T + b and as a result
@@ -718,28 +722,28 @@ class RowParallelLinear(torch.nn.Module):
         if config.use_cpu_initialization:
             self.weight = Parameter(torch.empty(self.output_size,
                                                 self.input_size_per_partition,
-                                                dtype=config.params_dtype))
+                                                dtype=dtype))
             if config.perform_initialization:
                 self.master_weight = _initialize_affine_weight_cpu(
                     self.weight, self.output_size, self.input_size,
                     self.input_size_per_partition, 1, init_method,
                     stride=stride, return_master_weight=keep_master_weight_for_test,
-                    params_dtype=config.params_dtype)
+                    params_dtype=dtype)
         else:
             self.weight = Parameter(torch.empty(
                 self.output_size, self.input_size_per_partition,
-                device=get_accelerator().current_device_name(), dtype=config.params_dtype))
+                device=get_accelerator().current_device_name(), dtype=dtype))
             if config.perform_initialization:
                 _initialize_affine_weight_gpu(self.weight, init_method,
                                               partition_dim=1, stride=stride)
         if bias:
             if config.use_cpu_initialization:
                 self.bias = Parameter(torch.empty(self.output_size,
-                                                  dtype=config.params_dtype))
+                                                  dtype=dtype))
             else:
                 self.bias = Parameter(torch.empty(
                     self.output_size, device=get_accelerator().current_device_name(),
-                    dtype=config.params_dtype))
+                    dtype=dtype))
             setattr(self.bias, 'sequence_parallel', self.sequence_parallel)
 
             if config.perform_initialization:
